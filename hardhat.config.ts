@@ -60,9 +60,7 @@ module.exports = {
   etherscan: {
     apiKey: {
       mainnet: process.env.ETHEREUM_API_KEY,
-      goerli: process.env.ETHEREUM_API_KEY,
-      polygon: process.env.POLY_SCAN_API_KEY,
-      polygonMumbai: process.env.POLY_SCAN_API_KEY,
+      goerli: process.env.ETHEREUM_API_KEY
     },
   },
 }
