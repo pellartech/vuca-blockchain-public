@@ -20,7 +20,7 @@ module.exports = {
         settings: {
           optimizer: {
             enabled: true,
-            runs: 200,
+            runs: 9999,
           },
         },
       },
@@ -29,7 +29,7 @@ module.exports = {
         settings: {
           optimizer: {
             enabled: true,
-            runs: 200,
+            runs: 9999,
           },
         },
       },
@@ -38,8 +38,12 @@ module.exports = {
   networks: {
     hardhat: {
       initialBaseFeePerGas: 0,
-      blockGasLimit: 30000000000000,
+      blockGasLimit: 999999999999999,
       accounts: require('./accounts.json'),
+      mining: {
+        auto: false,
+        interval: 0,
+      },
     },
     goerli: {
       url: process.env.GOERLI_PROVIDER_URL,
@@ -60,7 +64,7 @@ module.exports = {
   etherscan: {
     apiKey: {
       mainnet: process.env.ETHEREUM_API_KEY,
-      goerli: process.env.ETHEREUM_API_KEY
+      goerli: process.env.ETHEREUM_API_KEY,
     },
   },
 }

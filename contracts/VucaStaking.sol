@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import "hardhat/console.sol";
 
 contract PellarStaking is Ownable {
   // Staking of user
@@ -48,9 +49,10 @@ contract PellarStaking is Ownable {
   /* User */
   function stake(uint256 _poolId, uint256 _amount) external {
     Pool storage pool = pools[_poolId];
-    require(pool.startBlock <= block.timestamp, "Staking inactive");
+    require(pool.startBlock <= block.number, "Staking inactive");
+    require(pool.endBlock >= block.number, "Staking ended");
     require(_amount > 0, "Invalid amount");
-    require(_amount + pool.tokensStaked < pool.maxStakeTokens, "Exceed max stake tokens");
+    require(_amount + pool.tokensStaked <= pool.maxStakeTokens, "Exceed max stake tokens");
 
     Staking storage staking = stakingUsersInfo[_poolId][msg.sender];
 
@@ -93,7 +95,7 @@ contract PellarStaking is Ownable {
 
   function unStake(uint256 _poolId) external {
     Pool storage pool = pools[_poolId];
-    require(pool.endBlock <= block.timestamp, "Staking active");
+    require(pool.endBlock <= block.number, "Staking active");
 
     Staking storage staking = stakingUsersInfo[_poolId][msg.sender];
     uint256 amount = staking.amount;
@@ -102,7 +104,7 @@ contract PellarStaking is Ownable {
     updatePoolRewards(_poolId);
 
     // Pay rewards
-    uint256 rewards = ((amount * pool.accumulatedRewardsPerShare) - staking.minusRewards) / (10 ** IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+    uint256 rewards = ((amount * pool.accumulatedRewardsPerShare) - staking.minusRewards) / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
     IERC20(pool.rewardToken).transfer(msg.sender, rewards);
 
     // Update staker
@@ -128,7 +130,7 @@ contract PellarStaking is Ownable {
 
     uint256 blocksSinceLastReward = floorBlock - pool.lastRewardedBlock;
     uint256 rewards = blocksSinceLastReward * pool.rewardTokensPerBlock;
-    if (pool.tokensStaked != 0) {
+    if (pool.tokensStaked > 0) {
       pool.accumulatedRewardsPerShare += (rewards / pool.tokensStaked);
     }
     pool.lastRewardedBlock = floorBlock;
@@ -156,21 +158,21 @@ contract PellarStaking is Ownable {
     pool.startBlock = _startBlock;
     pool.endBlock = _endBlock;
 
-    pool.rewardTokensPerBlock = _rewardTokensPerBlock * (10 ** IERC20(_stakeToken).decimals()) * REWARDS_PRECISION;
+    pool.rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20(_stakeToken).decimals()) * REWARDS_PRECISION;
     pool.lastRewardedBlock = _startBlock;
 
     emit PoolUpdated(currentPoolId);
     currentPoolId += 1;
   }
 
-  function updateRewardTokensPerBlock(uint256 _poolId,uint256 _rewardTokensPerBlock) external onlyOwner {
+  function updateRewardTokensPerBlock(uint256 _poolId, uint256 _rewardTokensPerBlock) external onlyOwner {
     require(pools[_poolId].inited, "Invalid Pool");
 
-    pools[_poolId].rewardTokensPerBlock = _rewardTokensPerBlock * (10 ** IERC20(pools[_poolId].stakeToken).decimals()) * REWARDS_PRECISION;
+    pools[_poolId].rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20(pools[_poolId].stakeToken).decimals()) * REWARDS_PRECISION;
     updatePoolRewards(_poolId);
   }
 
-  function updateEndBlock(uint256 _poolId,uint256 _endBlock) external onlyOwner {
+  function updateEndBlock(uint256 _poolId, uint256 _endBlock) external onlyOwner {
     require(pools[_poolId].inited, "Invalid Pool");
 
     // change after 8 hours - TODO
