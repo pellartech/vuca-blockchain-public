@@ -24,7 +24,7 @@ contract PellarStaking is Ownable {
     uint256 accumulatedRewardsPerShare;
   }
 
-  uint256 public constant REWARDS_PRECISION = 1e12;
+  uint256 public constant REWARDS_PRECISION = 1e18;
 
   uint256 public currentPoolId;
 
@@ -91,9 +91,9 @@ contract PellarStaking is Ownable {
     emit Withdraw(msg.sender, _poolId, amount);
   }
 
-  function unstake(uint256 _poolId) external {
+  function unStake(uint256 _poolId) external {
     Pool storage pool = pools[_poolId];
-    require(pool.endBlock >= block.timestamp, "Staking active");
+    require(pool.endBlock <= block.timestamp, "Staking active");
 
     Staking storage staking = stakingUsersInfo[_poolId][msg.sender];
     uint256 amount = staking.amount;
@@ -102,7 +102,7 @@ contract PellarStaking is Ownable {
     updatePoolRewards(_poolId);
 
     // Pay rewards
-    uint256 rewards = ((amount * pool.accumulatedRewardsPerShare) - staking.minusRewards) / IERC20(pool.rewardToken).decimals() / REWARDS_PRECISION;
+    uint256 rewards = ((amount * pool.accumulatedRewardsPerShare) - staking.minusRewards) / (10 ** IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
     IERC20(pool.rewardToken).transfer(msg.sender, rewards);
 
     // Update staker
@@ -156,9 +156,8 @@ contract PellarStaking is Ownable {
     pool.startBlock = _startBlock;
     pool.endBlock = _endBlock;
 
-    pool.rewardTokensPerBlock = _rewardTokensPerBlock * IERC20(_rewardToken).decimals() * REWARDS_PRECISION;
+    pool.rewardTokensPerBlock = _rewardTokensPerBlock * (10 ** IERC20(_stakeToken).decimals()) * REWARDS_PRECISION;
     pool.lastRewardedBlock = _startBlock;
-    pool.stakeToken = _stakeToken;
 
     emit PoolUpdated(currentPoolId);
     currentPoolId += 1;
@@ -167,7 +166,7 @@ contract PellarStaking is Ownable {
   function updateRewardTokensPerBlock(uint256 _poolId,uint256 _rewardTokensPerBlock) external onlyOwner {
     require(pools[_poolId].inited, "Invalid Pool");
 
-    pools[_poolId].rewardTokensPerBlock = _rewardTokensPerBlock * IERC20(pools[_poolId].rewardToken).decimals() * REWARDS_PRECISION;
+    pools[_poolId].rewardTokensPerBlock = _rewardTokensPerBlock * (10 ** IERC20(pools[_poolId].stakeToken).decimals()) * REWARDS_PRECISION;
     updatePoolRewards(_poolId);
   }
 
