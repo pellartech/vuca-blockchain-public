@@ -2,12 +2,12 @@
 pragma solidity 0.8.15;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import "hardhat/console.sol";
 
 contract PellarStaking is Ownable {
   // Staking of user
   struct Staking {
     uint256 amount;
+    uint256 accumulatedRewards;
     uint256 minusRewards; // rewards that user can not get computed by passed block
   }
 
@@ -44,7 +44,20 @@ contract PellarStaking is Ownable {
   constructor() {}
 
   /* View */
-  function getRewards() external {}
+  function getRawRewards(uint256 _poolId, address _account) public view returns (uint256) {
+    Staking memory staking = stakingUsersInfo[_poolId][_account];
+
+    (uint256 accumulatedRewardsPerShare, ) = getPoolRewardsCheckpoint(_poolId);
+
+    return staking.accumulatedRewards + (staking.amount * accumulatedRewardsPerShare) - staking.minusRewards;
+  }
+
+  function getRewards(uint256 _poolId, address _account) public view returns (uint256) {
+    uint256 rawRewrads = getRawRewards(_poolId, _account);
+    Pool memory pool = pools[_poolId];
+
+    return rawRewrads / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+  }
 
   /* User */
   function stake(uint256 _poolId, uint256 _amount) external {
@@ -59,8 +72,9 @@ contract PellarStaking is Ownable {
     updatePoolRewards(_poolId);
 
     // update user
-    staking.minusRewards += _amount * pool.accumulatedRewardsPerShare;
+    staking.accumulatedRewards = getRawRewards(_poolId, msg.sender);
     staking.amount += _amount;
+    staking.minusRewards = staking.amount * pool.accumulatedRewardsPerShare;
 
     // Update pool
     pool.tokensStaked += _amount;
@@ -79,6 +93,7 @@ contract PellarStaking is Ownable {
     updatePoolRewards(_poolId);
 
     // Update staker
+    staking.accumulatedRewards = 0;
     staking.minusRewards = 0;
     staking.amount = 0;
 
@@ -104,7 +119,7 @@ contract PellarStaking is Ownable {
     updatePoolRewards(_poolId);
 
     // Pay rewards
-    uint256 rewards = ((amount * pool.accumulatedRewardsPerShare) - staking.minusRewards) / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+    uint256 rewards = getRewards(_poolId, msg.sender);
     IERC20(pool.rewardToken).transfer(msg.sender, rewards);
 
     // Update staker
@@ -126,14 +141,20 @@ contract PellarStaking is Ownable {
   function updatePoolRewards(uint256 _poolId) internal {
     Pool storage pool = pools[_poolId];
 
+    (pool.accumulatedRewardsPerShare, pool.lastRewardedBlock) = getPoolRewardsCheckpoint(_poolId);
+  }
+
+  function getPoolRewardsCheckpoint(uint256 _poolId) internal view returns (uint256 accumulatedRewardsPerShare, uint256 lastRewardedBlock) {
+    Pool memory pool = pools[_poolId];
+
     uint256 floorBlock = block.number <= pool.endBlock ? block.number : pool.endBlock;
 
     uint256 blocksSinceLastReward = floorBlock - pool.lastRewardedBlock;
     uint256 rewards = blocksSinceLastReward * pool.rewardTokensPerBlock;
     if (pool.tokensStaked > 0) {
-      pool.accumulatedRewardsPerShare += (rewards / pool.tokensStaked);
+      accumulatedRewardsPerShare = pool.accumulatedRewardsPerShare + (rewards / pool.tokensStaked);
     }
-    pool.lastRewardedBlock = floorBlock;
+    lastRewardedBlock = floorBlock;
   }
 
   /* Admin */
@@ -168,8 +189,8 @@ contract PellarStaking is Ownable {
   function updateRewardTokensPerBlock(uint256 _poolId, uint256 _rewardTokensPerBlock) external onlyOwner {
     require(pools[_poolId].inited, "Invalid Pool");
 
-    pools[_poolId].rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20(pools[_poolId].stakeToken).decimals()) * REWARDS_PRECISION;
     updatePoolRewards(_poolId);
+    pools[_poolId].rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20(pools[_poolId].stakeToken).decimals()) * REWARDS_PRECISION;
   }
 
   function updateEndBlock(uint256 _poolId, uint256 _endBlock) external onlyOwner {
@@ -197,5 +218,5 @@ interface IERC20 {
 
   function transfer(address to, uint256 amount) external returns (bool);
 
-  function decimals() external returns (uint8);
+  function decimals() external view returns (uint8);
 }
