@@ -195,6 +195,7 @@ contract PellarStaking is Ownable {
 
   function updateEndBlock(uint256 _poolId, uint256 _endBlock) external onlyOwner {
     require(pools[_poolId].inited, "Invalid Pool");
+    require(block.timestamp <= _endBlock, "Invalid input");
 
     // change after 8 hours - TODO
     pools[_poolId].endBlock = _endBlock;
