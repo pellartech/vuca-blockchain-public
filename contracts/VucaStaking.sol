@@ -36,8 +36,7 @@ contract PellarStaking is Ownable {
 
   // Events
   event Deposit(address indexed user, uint256 indexed poolId, uint256 amount);
-  event Withdraw(address indexed user, uint256 indexed poolId, uint256 amount);
-  event HarvestRewards(address indexed user, uint256 indexed poolId, uint256 amount);
+  event Withdraw(address indexed user, uint256 indexed poolId, uint256 amount, uint256 prize);
   event PoolUpdated(uint256 poolId, bytes info);
 
   // Constructor
@@ -105,7 +104,7 @@ contract PellarStaking is Ownable {
     // Withdraw tokens
     IERC20(pool.stakeToken).transfer(address(msg.sender), amount);
 
-    emit Withdraw(msg.sender, _poolId, amount);
+    emit Withdraw(msg.sender, _poolId, amount, 0);
   }
 
   function unStake(uint256 _poolId) external {
@@ -134,8 +133,7 @@ contract PellarStaking is Ownable {
     // Withdraw tokens
     IERC20(pool.stakeToken).transfer(address(msg.sender), amount);
 
-    emit Withdraw(msg.sender, _poolId, amount);
-    emit HarvestRewards(msg.sender, _poolId, rewards);
+    emit Withdraw(msg.sender, _poolId, amount, rewards);
   }
 
   function updatePoolRewards(uint256 _poolId) internal {
