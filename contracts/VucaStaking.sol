@@ -35,8 +35,7 @@ contract PellarStaking is Ownable {
   mapping(uint256 => mapping(address => Staking)) public stakingUsersInfo;
 
   // Events
-  event Deposit(address indexed user, uint256 indexed poolId, Pool pool, Staking staking);
-  event Withdraw(address indexed user, uint256 indexed poolId, Pool pool, Staking staking);
+  event StakingChange(address indexed user, uint256 indexed poolId, Pool pool, Staking staking);
   event PoolUpdated(uint256 poolId, Pool pool);
 
   // Constructor
@@ -79,7 +78,7 @@ contract PellarStaking is Ownable {
     pool.tokensStaked += _amount;
 
     // Deposit tokens
-    emit Deposit(msg.sender, _poolId, pool, staking);
+    emit StakingChange(msg.sender, _poolId, pool, staking);
     IERC20(pool.stakeToken).transferFrom(address(msg.sender), address(this), _amount);
   }
 
@@ -96,15 +95,16 @@ contract PellarStaking is Ownable {
       pool.tokensStaked -= amount;
     }
 
+    staking.amount = 0;
+
     // Withdraw tokens
     IERC20(pool.stakeToken).transfer(address(msg.sender), amount);
 
-    emit Withdraw(msg.sender, _poolId, pool, staking);
+    emit StakingChange(msg.sender, _poolId, pool, staking);
     
     // Update staker
     staking.accumulatedRewards = 0;
     staking.minusRewards = 0;
-    staking.amount = 0;
   }
 
   function unStake(uint256 _poolId) external {
@@ -129,7 +129,7 @@ contract PellarStaking is Ownable {
     // Withdraw tokens
     IERC20(pool.stakeToken).transfer(address(msg.sender), amount);
 
-    emit Withdraw(msg.sender, _poolId, pool, staking);
+    emit StakingChange(msg.sender, _poolId, pool, staking);
 
     // Update staker
     staking.accumulatedRewards = 0;
