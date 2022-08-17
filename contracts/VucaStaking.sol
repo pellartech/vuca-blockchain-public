@@ -35,8 +35,8 @@ contract PellarStaking is Ownable {
   mapping(uint256 => mapping(address => Staking)) public stakingUsersInfo;
 
   // Events
-  event Deposit(address indexed user, uint256 indexed poolId, uint256 amount, Pool pool);
-  event Withdraw(address indexed user, uint256 indexed poolId, uint256 amount, Pool pool);
+  event Deposit(address indexed user, uint256 indexed poolId, Pool pool, Staking staking);
+  event Withdraw(address indexed user, uint256 indexed poolId, Pool pool, Staking staking);
   event PoolUpdated(uint256 poolId, Pool pool);
 
   // Constructor
@@ -79,7 +79,7 @@ contract PellarStaking is Ownable {
     pool.tokensStaked += _amount;
 
     // Deposit tokens
-    emit Deposit(msg.sender, _poolId, _amount, pool);
+    emit Deposit(msg.sender, _poolId, pool, staking);
     IERC20(pool.stakeToken).transferFrom(address(msg.sender), address(this), _amount);
   }
 
@@ -91,11 +91,6 @@ contract PellarStaking is Ownable {
 
     updatePoolRewards(_poolId);
 
-    // Update staker
-    staking.accumulatedRewards = 0;
-    staking.minusRewards = 0;
-    staking.amount = 0;
-
     // Update pool
     if (pool.tokensStaked >= amount) {
       pool.tokensStaked -= amount;
@@ -104,7 +99,12 @@ contract PellarStaking is Ownable {
     // Withdraw tokens
     IERC20(pool.stakeToken).transfer(address(msg.sender), amount);
 
-    emit Withdraw(msg.sender, _poolId, amount, pool);
+    emit Withdraw(msg.sender, _poolId, pool, staking);
+    
+    // Update staker
+    staking.accumulatedRewards = 0;
+    staking.minusRewards = 0;
+    staking.amount = 0;
   }
 
   function unStake(uint256 _poolId) external {
@@ -121,11 +121,6 @@ contract PellarStaking is Ownable {
     uint256 rewards = getRewards(_poolId, msg.sender);
     IERC20(pool.rewardToken).transfer(msg.sender, rewards);
 
-    // Update staker
-    staking.accumulatedRewards = 0;
-    staking.minusRewards = 0;
-    staking.amount = 0;
-
     // Update pool
     if (pool.tokensStaked >= amount) {
       pool.tokensStaked -= amount;
@@ -134,7 +129,12 @@ contract PellarStaking is Ownable {
     // Withdraw tokens
     IERC20(pool.stakeToken).transfer(address(msg.sender), amount);
 
-    emit Withdraw(msg.sender, _poolId, amount, pool);
+    emit Withdraw(msg.sender, _poolId, pool, staking);
+
+    // Update staker
+    staking.accumulatedRewards = 0;
+    staking.minusRewards = 0;
+    staking.amount = 0;
   }
 
   function updatePoolRewards(uint256 _poolId) internal {
