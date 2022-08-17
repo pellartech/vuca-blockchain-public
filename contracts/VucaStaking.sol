@@ -35,9 +35,9 @@ contract PellarStaking is Ownable {
   mapping(uint256 => mapping(address => Staking)) public stakingUsersInfo;
 
   // Events
-  event Deposit(address indexed user, uint256 indexed poolId, uint256 amount);
-  event Withdraw(address indexed user, uint256 indexed poolId, uint256 amount, uint256 prize);
-  event PoolUpdated(uint256 poolId, bytes info);
+  event Deposit(address indexed user, uint256 indexed poolId, uint256 amount, Pool pool);
+  event Withdraw(address indexed user, uint256 indexed poolId, uint256 amount, Pool pool);
+  event PoolUpdated(uint256 poolId, Pool pool);
 
   // Constructor
   constructor() {}
@@ -79,7 +79,7 @@ contract PellarStaking is Ownable {
     pool.tokensStaked += _amount;
 
     // Deposit tokens
-    emit Deposit(msg.sender, _poolId, _amount);
+    emit Deposit(msg.sender, _poolId, _amount, pool);
     IERC20(pool.stakeToken).transferFrom(address(msg.sender), address(this), _amount);
   }
 
@@ -104,7 +104,7 @@ contract PellarStaking is Ownable {
     // Withdraw tokens
     IERC20(pool.stakeToken).transfer(address(msg.sender), amount);
 
-    emit Withdraw(msg.sender, _poolId, amount, 0);
+    emit Withdraw(msg.sender, _poolId, amount, pool);
   }
 
   function unStake(uint256 _poolId) external {
@@ -122,6 +122,7 @@ contract PellarStaking is Ownable {
     IERC20(pool.rewardToken).transfer(msg.sender, rewards);
 
     // Update staker
+    staking.accumulatedRewards = 0;
     staking.minusRewards = 0;
     staking.amount = 0;
 
@@ -133,7 +134,7 @@ contract PellarStaking is Ownable {
     // Withdraw tokens
     IERC20(pool.stakeToken).transfer(address(msg.sender), amount);
 
-    emit Withdraw(msg.sender, _poolId, amount, rewards);
+    emit Withdraw(msg.sender, _poolId, amount, pool);
   }
 
   function updatePoolRewards(uint256 _poolId) internal {
@@ -180,19 +181,7 @@ contract PellarStaking is Ownable {
     pool.rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20(_stakeToken).decimals()) * REWARDS_PRECISION;
     pool.lastRewardedBlock = _startBlock;
 
-    emit PoolUpdated(
-      currentPoolId,
-      abi.encode(
-        _rewardToken, //
-        _stakeToken,
-        _maxStakeTokens,
-        _startBlock,
-        _endBlock,
-        _rewardTokensPerBlock,
-        10**IERC20(_stakeToken).decimals(), // stake token decimals
-        REWARDS_PRECISION
-      )
-    );
+    emit PoolUpdated(currentPoolId, pool);
     currentPoolId += 1;
   }
 
@@ -201,19 +190,7 @@ contract PellarStaking is Ownable {
 
     updatePoolRewards(_poolId);
     pools[_poolId].rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20(pools[_poolId].stakeToken).decimals()) * REWARDS_PRECISION;
-    emit PoolUpdated(
-      _poolId,
-      abi.encode(
-        pools[_poolId].rewardToken, //
-        pools[_poolId].stakeToken,
-        pools[_poolId].maxStakeTokens,
-        pools[_poolId].startBlock,
-        pools[_poolId].endBlock,
-        _rewardTokensPerBlock,
-        10**IERC20(pools[_poolId].stakeToken).decimals(), // stake token decimals
-        REWARDS_PRECISION
-      )
-    );
+    emit PoolUpdated(_poolId, pools[_poolId]);
   }
 
   function updateEndBlock(uint256 _poolId, uint256 _endBlock) external onlyOwner {
@@ -222,19 +199,7 @@ contract PellarStaking is Ownable {
 
     // change after 8 hours - TODO
     pools[_poolId].endBlock = _endBlock;
-    emit PoolUpdated(
-      _poolId,
-      abi.encode(
-        pools[_poolId].rewardToken, //
-        pools[_poolId].stakeToken,
-        pools[_poolId].maxStakeTokens,
-        pools[_poolId].startBlock,
-        pools[_poolId].endBlock,
-        pools[_poolId].rewardTokensPerBlock / REWARDS_PRECISION / (10**IERC20(pools[_poolId].stakeToken).decimals()),
-        10**IERC20(pools[_poolId].stakeToken).decimals(), // stake token decimals
-        REWARDS_PRECISION
-      )
-    );
+    emit PoolUpdated(_poolId, pools[_poolId]);
   }
 
   function failureWithdrawERC20(
