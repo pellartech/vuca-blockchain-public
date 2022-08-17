@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity ^0.8.15;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -38,7 +38,7 @@ contract PellarStaking is Ownable {
   event Deposit(address indexed user, uint256 indexed poolId, uint256 amount);
   event Withdraw(address indexed user, uint256 indexed poolId, uint256 amount);
   event HarvestRewards(address indexed user, uint256 indexed poolId, uint256 amount);
-  event PoolUpdated(uint256 poolId);
+  event PoolUpdated(uint256 poolId, bytes info);
 
   // Constructor
   constructor() {}
@@ -182,7 +182,19 @@ contract PellarStaking is Ownable {
     pool.rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20(_stakeToken).decimals()) * REWARDS_PRECISION;
     pool.lastRewardedBlock = _startBlock;
 
-    emit PoolUpdated(currentPoolId);
+    emit PoolUpdated(
+      currentPoolId,
+      abi.encode(
+        _rewardToken, //
+        _stakeToken,
+        _maxStakeTokens,
+        _startBlock,
+        _endBlock,
+        _rewardTokensPerBlock,
+        10**IERC20(_stakeToken).decimals(), // stake token decimals
+        REWARDS_PRECISION
+      )
+    );
     currentPoolId += 1;
   }
 
@@ -191,6 +203,19 @@ contract PellarStaking is Ownable {
 
     updatePoolRewards(_poolId);
     pools[_poolId].rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20(pools[_poolId].stakeToken).decimals()) * REWARDS_PRECISION;
+    emit PoolUpdated(
+      _poolId,
+      abi.encode(
+        pools[_poolId].rewardToken, //
+        pools[_poolId].stakeToken,
+        pools[_poolId].maxStakeTokens,
+        pools[_poolId].startBlock,
+        pools[_poolId].endBlock,
+        _rewardTokensPerBlock,
+        10**IERC20(pools[_poolId].stakeToken).decimals(), // stake token decimals
+        REWARDS_PRECISION
+      )
+    );
   }
 
   function updateEndBlock(uint256 _poolId, uint256 _endBlock) external onlyOwner {
@@ -199,6 +224,19 @@ contract PellarStaking is Ownable {
 
     // change after 8 hours - TODO
     pools[_poolId].endBlock = _endBlock;
+    emit PoolUpdated(
+      _poolId,
+      abi.encode(
+        pools[_poolId].rewardToken, //
+        pools[_poolId].stakeToken,
+        pools[_poolId].maxStakeTokens,
+        pools[_poolId].startBlock,
+        pools[_poolId].endBlock,
+        pools[_poolId].rewardTokensPerBlock / REWARDS_PRECISION / (10**IERC20(pools[_poolId].stakeToken).decimals()),
+        10**IERC20(pools[_poolId].stakeToken).decimals(), // stake token decimals
+        REWARDS_PRECISION
+      )
+    );
   }
 
   function failureWithdrawERC20(
