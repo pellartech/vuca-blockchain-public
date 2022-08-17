@@ -14,7 +14,7 @@ async function main() {
   // await hre.run('compile');
 
   // We get the contract to deploy
-  const Factory = await hre.ethers.getContractFactory("VucaStaking");
+  const Factory = await hre.ethers.getContractFactory("PellarStaking");
   const res = await Factory.deploy();
 
   await res.deployed();
