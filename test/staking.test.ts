@@ -5,6 +5,7 @@ import { solidity } from 'ethereum-waffle'
 
 import { CWTT, CWTT__factory, PellarStaking, PellarStaking__factory, USDT, USDT__factory } from '../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
+import moment from 'moment'
 
 chai.use(solidity)
 chai.use(chaiAsPromised)
@@ -486,19 +487,15 @@ describe('Staking', () => {
       await stakingContract.connect(owner).updateRewardTokensPerBlock(0, 20 * 10 ** 6)
       await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
       await network.provider.send('evm_mine')
-
-      poolInfo = await stakingContract.pools(0)
-
-      expect(poolInfo.rewardTokensPerBlock).equal(
-        ethers.BigNumber.from(20 * 10 ** 6)
-          .mul(TEN_E_18)
-          .mul(TEN_E_18)
-      )
+      const currentTime = moment.utc().unix()
+      await network.provider.send("evm_setNextBlockTimestamp", [currentTime + 8 * 60 * 60 + 1])
+      await network.provider.send("evm_mine")
 
       // unStake
-      await stakingContract.connect(owner).updateRewardTokensPerBlock(0, 5 * 10 ** 6)
+      await stakingContract.connect(owner).updateRewardTokensPerBlock(0, 5 * 10 ** 6)      
       await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
       await network.provider.send('evm_mine')
+      await network.provider.send("evm_setNextBlockTimestamp", [currentTime + 8 * 60 * 60 + 8 * 60 * 60 + 2])
       await network.provider.send('evm_mine')
 
       await stakingContract.connect(bob).unStake(0)
@@ -528,7 +525,7 @@ describe('Staking', () => {
       //     )
       // )
 
-      expect((await usdtToken.balanceOf(bob.address)).toNumber() / 10 ** 6).equal(36.95238)
+      expect((await usdtToken.balanceOf(bob.address)).toNumber() / 10 ** 6).equal(32.666666)
       expect((await usdtToken.balanceOf(alice.address)).toNumber() / 10 ** 6).equal(8.047619)
     })
   })
