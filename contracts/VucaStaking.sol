@@ -32,6 +32,7 @@ contract PellarStaking is Ownable {
     uint256 endBlock;
     uint256 rewardTokensPerBlock;
     uint256 timestamp;
+    uint256 blockNumber;
   }
 
   uint256 public constant REWARDS_PRECISION = 1e18;
@@ -173,7 +174,8 @@ contract PellarStaking is Ownable {
           rewardTokensPerBlock: 0, //
           endBlock: 0,
           maxStakeTokens: 0,
-          timestamp: 0
+          timestamp: 0,
+          blockNumber: 0
         })
       );
     }
@@ -185,8 +187,8 @@ contract PellarStaking is Ownable {
     if (
       !exists || //
       changes.applied ||
-      block.timestamp > pools[_poolId].endBlock ||
-      block.timestamp < (changes.timestamp + UPDATE_DELAY)
+      block.timestamp < (changes.timestamp + UPDATE_DELAY) ||
+      changes.blockNumber > pools[_poolId].endBlock
     ) {
       return;
     }
@@ -207,8 +209,8 @@ contract PellarStaking is Ownable {
     if (
       !exists || //
       changes.applied ||
-      block.timestamp > pool.endBlock ||
-      block.timestamp < (changes.timestamp + UPDATE_DELAY)
+      block.timestamp < (changes.timestamp + UPDATE_DELAY) ||
+      changes.blockNumber > pool.endBlock
     ) {
       return pool;
     }
@@ -275,7 +277,8 @@ contract PellarStaking is Ownable {
         rewardTokensPerBlock: pools[_poolId].rewardTokensPerBlock, //
         endBlock: pools[_poolId].endBlock,
         maxStakeTokens: _maxStakeTokens,
-        timestamp: block.timestamp
+        timestamp: block.timestamp,
+        blockNumber: block.number
       })
     );
 
@@ -285,6 +288,8 @@ contract PellarStaking is Ownable {
   function updateRewardTokensPerBlock(uint256 _poolId, uint256 _rewardTokensPerBlock) external onlyOwner {
     require(pools[_poolId].inited, "Invalid Pool");
 
+    updatePoolInfo(_poolId);
+
     uint256 rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20(pools[_poolId].stakeToken).decimals()) * REWARDS_PRECISION;
 
     poolsChanges[_poolId].push(
@@ -293,7 +298,8 @@ contract PellarStaking is Ownable {
         rewardTokensPerBlock: rewardTokensPerBlock, //
         endBlock: pools[_poolId].endBlock,
         maxStakeTokens: pools[_poolId].maxStakeTokens,
-        timestamp: block.timestamp
+        timestamp: block.timestamp,
+        blockNumber: block.number
       })
     );
 
@@ -310,7 +316,8 @@ contract PellarStaking is Ownable {
         rewardTokensPerBlock: pools[_poolId].rewardTokensPerBlock, //
         endBlock: _endBlock,
         maxStakeTokens: pools[_poolId].maxStakeTokens,
-        timestamp: block.timestamp
+        timestamp: block.timestamp,
+        blockNumber: block.number
       })
     );
 

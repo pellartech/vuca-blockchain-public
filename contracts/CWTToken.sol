@@ -8,6 +8,6 @@ contract CWTToken is Ownable, ERC20 {
   uint256 public constant MAX_SUPPLY = 140000000;
 
   constructor() ERC20("CWT", "CWT") {
-    _mint(msg.sender, MAX_SUPPLY * decimals());
+    _mint(msg.sender, MAX_SUPPLY * (10**decimals()));
   }
 }

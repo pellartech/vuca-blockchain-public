@@ -452,7 +452,7 @@ describe('Staking', () => {
           .mul(TEN_E_18)
           .toString(),
         10,
-        14,
+        20,
         10 * 10 ** 6
       )
       await network.provider.send('evm_mine')
@@ -463,7 +463,7 @@ describe('Staking', () => {
       expect(poolInfo.stakeToken).equal(cwtToken.address)
       expect(poolInfo.maxStakeTokens).equal(ethers.BigNumber.from(10 ** 6).mul(TEN_E_18))
       expect(poolInfo.startBlock.toNumber()).equal(10)
-      expect(poolInfo.endBlock.toNumber()).equal(14)
+      expect(poolInfo.endBlock.toNumber()).equal(20)
       expect(poolInfo.rewardTokensPerBlock).equal(
         ethers.BigNumber.from(10 * 10 ** 6)
           .mul(TEN_E_18)
@@ -488,14 +488,19 @@ describe('Staking', () => {
       await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
       await network.provider.send('evm_mine')
       const currentTime = moment.utc().unix()
-      await network.provider.send("evm_setNextBlockTimestamp", [currentTime + 8 * 60 * 60 + 1])
-      await network.provider.send("evm_mine")
+      await network.provider.send('evm_setNextBlockTimestamp', [currentTime + 6 * 60 * 60 + 1])
+      await network.provider.send('evm_mine')
 
       // unStake
-      await stakingContract.connect(owner).updateRewardTokensPerBlock(0, 5 * 10 ** 6)      
+      await stakingContract.connect(owner).updateRewardTokensPerBlock(0, 5 * 10 ** 6)
       await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
       await network.provider.send('evm_mine')
-      await network.provider.send("evm_setNextBlockTimestamp", [currentTime + 8 * 60 * 60 + 8 * 60 * 60 + 2])
+      await network.provider.send('evm_setNextBlockTimestamp', [currentTime + 8 * 60 * 60 + 8 * 60 * 60 + 2])
+      await network.provider.send('evm_mine')
+      await network.provider.send('evm_mine')
+      await network.provider.send('evm_mine')
+      await network.provider.send('evm_mine')
+      await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
 
       await stakingContract.connect(bob).unStake(0)
@@ -504,9 +509,12 @@ describe('Staking', () => {
       await stakingContract.connect(alice).unStake(0)
       await network.provider.send('evm_mine')
 
+      const tmp = await stakingContract.getLatestPoolInfo(0)
+      console.log(tmp)
+
       poolInfo = await stakingContract.pools(0)
 
-      expect(poolInfo.lastRewardedBlock.toNumber()).equal(14)
+      expect(poolInfo.lastRewardedBlock.toNumber()).equal(20)
       expect(poolInfo.rewardTokensPerBlock).equal(
         ethers.BigNumber.from(5 * 10 ** 6)
           .mul(TEN_E_18)
@@ -525,8 +533,8 @@ describe('Staking', () => {
       //     )
       // )
 
-      expect((await usdtToken.balanceOf(bob.address)).toNumber() / 10 ** 6).equal(32.666666)
-      expect((await usdtToken.balanceOf(alice.address)).toNumber() / 10 ** 6).equal(8.047619)
+      expect((await usdtToken.balanceOf(bob.address)).toNumber() / 10 ** 6).equal(58.380952)
+      expect((await usdtToken.balanceOf(alice.address)).toNumber() / 10 ** 6).equal(11.619047)
     })
   })
 
