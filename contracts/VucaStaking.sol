@@ -264,7 +264,7 @@ contract PellarStaking is Ownable {
     pools[currentPoolId].rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20(_stakeToken).decimals()) * REWARDS_PRECISION;
     pools[currentPoolId].lastRewardedBlock = _startBlock;
 
-    emit PoolUpdated(currentPoolId, pools[currentPoolId], block.number);
+    emit PoolUpdated(currentPoolId, pools[currentPoolId], block.timestamp);
     currentPoolId += 1;
   }
 
@@ -282,7 +282,7 @@ contract PellarStaking is Ownable {
       })
     );
 
-    emit PoolUpdated(_poolId, pools[_poolId], block.number + UPDATE_DELAY);
+    emit PoolUpdated(_poolId, pools[_poolId], block.timestamp + UPDATE_DELAY);
   }
 
   function updateRewardTokensPerBlock(uint256 _poolId, uint256 _rewardTokensPerBlock) external onlyOwner {
@@ -303,7 +303,7 @@ contract PellarStaking is Ownable {
       })
     );
 
-    emit PoolUpdated(_poolId, pools[_poolId], block.number + UPDATE_DELAY);
+    emit PoolUpdated(_poolId, pools[_poolId], block.timestamp + UPDATE_DELAY);
   }
 
   function updateEndBlock(uint256 _poolId, uint256 _endBlock) external onlyOwner {
@@ -321,7 +321,7 @@ contract PellarStaking is Ownable {
       })
     );
 
-    emit PoolUpdated(_poolId, pools[_poolId], block.number + UPDATE_DELAY);
+    emit PoolUpdated(_poolId, pools[_poolId], block.timestamp + UPDATE_DELAY);
   }
 
   function failureWithdrawERC20(
