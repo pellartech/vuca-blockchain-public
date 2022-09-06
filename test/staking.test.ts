@@ -493,15 +493,12 @@ describe('Staking', () => {
       await stakingContract.connect(owner).updateRewardTokensPerBlock(0, 20 * 10 ** 6)
       await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
       await network.provider.send('evm_mine')
-      const currentTime = moment.utc().unix()
-      await network.provider.send('evm_setNextBlockTimestamp', [currentTime + 6 * 60 * 60 + 1])
       await network.provider.send('evm_mine')
 
       // unStake
       await stakingContract.connect(owner).updateRewardTokensPerBlock(0, 5 * 10 ** 6)
       await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
       await network.provider.send('evm_mine')
-      await network.provider.send('evm_setNextBlockTimestamp', [currentTime + 8 * 60 * 60 + 8 * 60 * 60 + 2])
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
@@ -539,8 +536,8 @@ describe('Staking', () => {
       //     )
       // )
 
-      expect((await usdtToken.balanceOf(bob.address)).toNumber() / 10 ** 6).equal(58.380952)
-      expect((await usdtToken.balanceOf(alice.address)).toNumber() / 10 ** 6).equal(11.619047)
+      expect((await usdtToken.balanceOf(bob.address)).toNumber() / 10 ** 6).equal(88.380952)
+      expect((await usdtToken.balanceOf(alice.address)).toNumber() / 10 ** 6).equal(16.619047)
     })
 
     it('failureWithdrawERC20 should be success', async () => {
@@ -598,6 +595,10 @@ describe('Staking', () => {
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
 
+      await stakingContract.connect(bob).unStake(0)
+      await network.provider.send('evm_mine')
+
+
       let res = await usdtToken.balanceOf(stakingContract.address)
       console.log('1', res)
 
@@ -610,9 +611,6 @@ describe('Staking', () => {
 
       res = await usdtToken.balanceOf(stakingContract.address)
       console.log('2', res)
-
-      await stakingContract.connect(bob).unStake(0)
-      await network.provider.send('evm_mine')
 
       await stakingContract.connect(alice).unStake(0)
       await network.provider.send('evm_mine')
