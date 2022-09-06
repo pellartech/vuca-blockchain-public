@@ -27,7 +27,7 @@ contract PellarStaking is Ownable {
     uint256 accumulatedRewardsPerShare;
     uint256 totalRewardedBlock;
     uint256 accumulatedRewards;
-    uint256 updateDelay; // blocks
+    uint256 updateDelay; // blocks // default 2048 blocks = 8 hours
   }
 
   struct PoolChanges {
