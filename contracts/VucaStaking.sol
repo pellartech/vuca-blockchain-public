@@ -53,7 +53,7 @@ contract PellarStaking is Ownable {
 
   // Events
   event StakingChange(address indexed user, uint256 indexed poolId, Pool pool, Staking staking);
-  event PoolUpdated(uint256 poolId, Pool pool, uint256 activeBlock);
+  event PoolUpdated(uint256 poolId, Pool pool, PoolChanges changes, uint256 activeBlock);
 
   // Constructor
   constructor() {}
@@ -281,7 +281,9 @@ contract PellarStaking is Ownable {
     pools[currentPoolId].lastRewardedBlock = _startBlock;
     pools[currentPoolId].updateDelay = _updateDelay;
 
-    emit PoolUpdated(currentPoolId, pools[currentPoolId], block.number);
+    PoolChanges memory changes;
+
+    emit PoolUpdated(currentPoolId, pools[currentPoolId], changes, block.number);
     currentPoolId += 1;
   }
 
@@ -289,9 +291,10 @@ contract PellarStaking is Ownable {
     require(pools[_poolId].inited, "Invalid Pool");
     require(block.number + pools[_poolId].updateDelay < pools[_poolId].endBlock, "Exceed Blocks");
 
-    poolsChanges[_poolId].push(PoolChanges({ applied: false, rewardTokensPerBlock: pools[_poolId].rewardTokensPerBlock, endBlock: pools[_poolId].endBlock, maxStakeTokens: _maxStakeTokens, timestamp: block.timestamp, blockNumber: block.number }));
+    PoolChanges memory changes = PoolChanges({ applied: false, rewardTokensPerBlock: pools[_poolId].rewardTokensPerBlock, endBlock: pools[_poolId].endBlock, maxStakeTokens: _maxStakeTokens, timestamp: block.timestamp, blockNumber: block.number });
+    poolsChanges[_poolId].push(changes);
 
-    emit PoolUpdated(_poolId, pools[_poolId], block.number + pools[_poolId].updateDelay);
+    emit PoolUpdated(_poolId, pools[_poolId], changes, block.number + pools[_poolId].updateDelay);
   }
 
   function updateRewardTokensPerBlock(uint256 _poolId, uint256 _rewardTokensPerBlock) external onlyOwner {
@@ -300,9 +303,10 @@ contract PellarStaking is Ownable {
 
     uint256 rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20(pools[_poolId].stakeToken).decimals()) * REWARDS_PRECISION;
 
-    poolsChanges[_poolId].push(PoolChanges({ applied: false, rewardTokensPerBlock: rewardTokensPerBlock, endBlock: pools[_poolId].endBlock, maxStakeTokens: pools[_poolId].maxStakeTokens, timestamp: block.timestamp, blockNumber: block.number }));
+    PoolChanges memory changes = PoolChanges({ applied: false, rewardTokensPerBlock: rewardTokensPerBlock, endBlock: pools[_poolId].endBlock, maxStakeTokens: pools[_poolId].maxStakeTokens, timestamp: block.timestamp, blockNumber: block.number });
+    poolsChanges[_poolId].push(changes);
 
-    emit PoolUpdated(_poolId, pools[_poolId], block.number + pools[_poolId].updateDelay);
+    emit PoolUpdated(_poolId, pools[_poolId], changes, block.number + pools[_poolId].updateDelay);
   }
 
   function updateEndBlock(uint256 _poolId, uint256 _endBlock) external onlyOwner {
@@ -310,17 +314,19 @@ contract PellarStaking is Ownable {
     require(block.number <= _endBlock, "Invalid input");
     require(block.number + pools[_poolId].updateDelay < pools[_poolId].endBlock, "Exceed Blocks");
 
-    poolsChanges[_poolId].push(PoolChanges({ applied: false, rewardTokensPerBlock: pools[_poolId].rewardTokensPerBlock, endBlock: _endBlock, maxStakeTokens: pools[_poolId].maxStakeTokens, timestamp: block.timestamp, blockNumber: block.number }));
+    PoolChanges memory changes = PoolChanges({ applied: false, rewardTokensPerBlock: pools[_poolId].rewardTokensPerBlock, endBlock: _endBlock, maxStakeTokens: pools[_poolId].maxStakeTokens, timestamp: block.timestamp, blockNumber: block.number });
+    poolsChanges[_poolId].push(changes);
 
-    emit PoolUpdated(_poolId, pools[_poolId], block.number + pools[_poolId].updateDelay);
+    emit PoolUpdated(_poolId, pools[_poolId], changes, block.number + pools[_poolId].updateDelay);
   }
 
   function updateChangesDelayBlocks(uint256 _poolId, uint256 _blocks) external onlyOwner {
     require(pools[_poolId].inited, "Invalid Pool");
 
     pools[_poolId].updateDelay = _blocks;
+    PoolChanges memory changes;
 
-    emit PoolUpdated(_poolId, pools[_poolId], block.number);
+    emit PoolUpdated(_poolId, pools[_poolId], changes, block.number);
   }
 
   function failureWithdrawERC20(
