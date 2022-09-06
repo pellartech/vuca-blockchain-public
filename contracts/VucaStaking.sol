@@ -3,12 +3,14 @@ pragma solidity ^0.8.15;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
+// VUCA + Pellar + LightLink 2022
+
 contract PellarStaking is Ownable {
-  // Staking of user
+  // Staking user data
   struct Staking {
     uint256 amount;
     uint256 accumulatedRewards;
-    uint256 minusRewards; // rewards that user can not get computed by passed block
+    uint256 minusRewards; // rewards that user can not get computed by block
   }
 
   // Staking pool
@@ -25,7 +27,6 @@ contract PellarStaking is Ownable {
     uint256 accumulatedRewardsPerShare;
   }
 
-  //
   struct PoolChanges {
     bool applied;
     uint256 maxStakeTokens;
@@ -85,7 +86,7 @@ contract PellarStaking is Ownable {
 
     updatePoolRewards(_poolId);
 
-    // update user
+    // Update user
     staking.accumulatedRewards = getRawRewards(_poolId, msg.sender);
     staking.amount += _amount;
     staking.minusRewards = staking.amount * pool.accumulatedRewardsPerShare;
@@ -171,7 +172,7 @@ contract PellarStaking is Ownable {
         0,
         PoolChanges({
           applied: false,
-          rewardTokensPerBlock: 0, //
+          rewardTokensPerBlock: 0,
           endBlock: 0,
           maxStakeTokens: 0,
           timestamp: 0,
@@ -185,7 +186,7 @@ contract PellarStaking is Ownable {
   function updatePoolInfo(uint256 _poolId) internal {
     (bool exists, uint256 index, PoolChanges memory changes) = getLatestChange(_poolId);
     if (
-      !exists || //
+      !exists ||
       changes.applied ||
       block.timestamp < (changes.timestamp + UPDATE_DELAY) ||
       changes.blockNumber > pools[_poolId].endBlock
@@ -207,7 +208,7 @@ contract PellarStaking is Ownable {
 
     (bool exists, , PoolChanges memory changes) = getLatestChange(_poolId);
     if (
-      !exists || //
+      !exists ||
       changes.applied ||
       block.timestamp < (changes.timestamp + UPDATE_DELAY) ||
       changes.blockNumber > pool.endBlock
@@ -274,7 +275,7 @@ contract PellarStaking is Ownable {
     poolsChanges[_poolId].push(
       PoolChanges({
         applied: false,
-        rewardTokensPerBlock: pools[_poolId].rewardTokensPerBlock, //
+        rewardTokensPerBlock: pools[_poolId].rewardTokensPerBlock,
         endBlock: pools[_poolId].endBlock,
         maxStakeTokens: _maxStakeTokens,
         timestamp: block.timestamp,
@@ -295,7 +296,7 @@ contract PellarStaking is Ownable {
     poolsChanges[_poolId].push(
       PoolChanges({
         applied: false,
-        rewardTokensPerBlock: rewardTokensPerBlock, //
+        rewardTokensPerBlock: rewardTokensPerBlock,
         endBlock: pools[_poolId].endBlock,
         maxStakeTokens: pools[_poolId].maxStakeTokens,
         timestamp: block.timestamp,
@@ -313,7 +314,7 @@ contract PellarStaking is Ownable {
     poolsChanges[_poolId].push(
       PoolChanges({
         applied: false,
-        rewardTokensPerBlock: pools[_poolId].rewardTokensPerBlock, //
+        rewardTokensPerBlock: pools[_poolId].rewardTokensPerBlock,
         endBlock: _endBlock,
         maxStakeTokens: pools[_poolId].maxStakeTokens,
         timestamp: block.timestamp,
