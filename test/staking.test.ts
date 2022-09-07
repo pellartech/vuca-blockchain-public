@@ -683,7 +683,7 @@ describe('Staking', () => {
       await stakingContract.connect(owner).failureWithdrawERC20(
         0, //
         accounts[4].address,
-        ethers.BigNumber.from(10000 * 10 ** 6).sub(40000000).toString()
+        ethers.BigNumber.from(10000 * 10 ** 6).sub(70000000).toString()
       )
       await network.provider.send('evm_mine')
 
