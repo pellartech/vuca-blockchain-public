@@ -92,7 +92,7 @@ contract PellarStaking is Ownable {
       }
 
       uint256 rewards;
-      (pool.accumulatedRewardsPerShare, pool.lastRewardedBlock, rewards) = getPoolRewardsCheckpoint(_poolId, changes.blockNumber);
+      (pool.accumulatedRewardsPerShare, pool.lastRewardedBlock, rewards) = getPoolRewardsCheckpoint(_poolId, updateAtBlock);
       pool.totalUserRewards += rewards;
 
       pool.maxStakeTokens = changes.maxStakeTokens;
@@ -164,15 +164,14 @@ contract PellarStaking is Ownable {
 
     updatePoolRewards(_poolId, block.number);
     // Pay rewards
-    uint256 rawRewards = getRawRewards(_poolId, msg.sender);
-    uint256 rewards = rawRewards / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+    uint256 rewards = getRewards(_poolId, msg.sender);
     IERC20(pool.rewardToken).transfer(msg.sender, rewards);
 
     // Update pool
+    pool.rewardsWithdrew += getRawRewards(_poolId, msg.sender);
     if (pool.tokensStaked >= amount) {
       pool.tokensStaked -= amount;
     }
-    pool.rewardsWithdrew += rawRewards;
 
     // Withdraw tokens
     IERC20(pool.stakeToken).transfer(address(msg.sender), amount);
@@ -235,7 +234,10 @@ contract PellarStaking is Ownable {
 
     uint256 floorBlock = _blockNumber <= pool.endBlock ? _blockNumber : pool.endBlock;
 
-    uint256 blocksSinceLastReward = floorBlock - pool.lastRewardedBlock;
+    uint256 blocksSinceLastReward;
+    if (floorBlock >= pool.lastRewardedBlock) {
+      blocksSinceLastReward = floorBlock - pool.lastRewardedBlock;
+    }
     rewards = blocksSinceLastReward * pool.rewardTokensPerBlock;
     if (pool.tokensStaked > 0) {
       accumulatedRewardsPerShare = pool.accumulatedRewardsPerShare + (rewards / pool.tokensStaked);
@@ -323,10 +325,12 @@ contract PellarStaking is Ownable {
     address _to,
     uint256 _amount
   ) external onlyOwner {
-    Pool memory pool = getLatestPoolInfo(_poolId);
+    updatePoolInfo(_poolId);
+    Pool memory pool = pools[_poolId];
     require(pool.endBlock <= block.number, "Staking active");
 
     updatePoolRewards(_poolId, block.number);
+    pool = pools[_poolId];
 
     uint256 totalUserRewards = pool.totalUserRewards / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
     uint256 rewardsWithdrew = pool.rewardsWithdrew / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
@@ -342,7 +346,8 @@ contract PellarStaking is Ownable {
     address _to,
     uint256 _amount
   ) external onlyOwner {
-    Pool memory pool = getLatestPoolInfo(_poolId);
+    updatePoolInfo(_poolId);
+    Pool memory pool = pools[_poolId];
     require(pool.endBlock <= block.number, "Staking active");
     require(pool.tokensStaked == 0, "Not allowed");
 
