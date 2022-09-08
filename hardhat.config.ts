@@ -49,6 +49,10 @@ module.exports = {
       url: process.env.GOERLI_PROVIDER_URL,
       accounts: [process.env.GOERLI_PRIVATE_KEY],
     },
+    rinkeby: {
+      url: process.env.RINKEBY_PROVIDER_URL,
+      accounts: [process.env.RINKEBY_PRIVATE_KEY],
+    },
     mainnet: {
       url: process.env.MAINNET_PROVIDER_URL,
       accounts: [process.env.MAINNET_PRIVATE_KEY],
@@ -65,6 +69,7 @@ module.exports = {
     apiKey: {
       mainnet: process.env.ETHEREUM_API_KEY,
       goerli: process.env.ETHEREUM_API_KEY,
+      rinkeby: process.env.ETHEREUM_API_KEY,
     },
   },
 }
