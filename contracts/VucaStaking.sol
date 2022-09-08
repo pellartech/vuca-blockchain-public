@@ -100,7 +100,24 @@ contract PellarStaking is Ownable {
       pool.rewardTokensPerBlock = changes.rewardTokensPerBlock;
     }
 
+    uint256 _rewards;
+    (pool.accumulatedRewardsPerShare, pool.lastRewardedBlock, _rewards) = getPoolRewardsCheckpoint(_poolId, block.number);
+    pool.totalUserRewards += _rewards;
+
     return pool;
+  }
+
+  function getRewardsWithdrawable(uint256 _poolId) public view returns (uint256) {
+    Pool memory pool = getLatestPoolInfo(_poolId);
+
+    uint256 contractBalance = IERC20(pool.rewardToken).balanceOf(address(this));
+    if (pool.endBlock > block.number || contractBalance == 0) {
+      return 0;
+    }
+
+    uint256 totalUserRewards = pool.totalUserRewards / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+    uint256 rewardsWithdrew = pool.rewardsWithdrew / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+    return contractBalance + rewardsWithdrew - totalUserRewards;
   }
 
   /* User */

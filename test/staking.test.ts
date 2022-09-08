@@ -512,8 +512,8 @@ describe('Staking', () => {
       await stakingContract.connect(alice).unStake(0)
       await network.provider.send('evm_mine')
 
-      const tmp = await stakingContract.getLatestPoolInfo(0)
-      console.log(tmp)
+      // const tmp = await stakingContract.getLatestPoolInfo(0)
+      // console.log(tmp)
 
       poolInfo = await stakingContract.pools(0)
 
@@ -595,9 +595,7 @@ describe('Staking', () => {
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
 
-      await stakingContract.connect(bob).unStake(0)
-      await network.provider.send('evm_mine')
-
+      console.log(Number(await stakingContract.getRewardsWithdrawable(0)))
 
       let res = await usdtToken.balanceOf(stakingContract.address)
       console.log('1', res)
@@ -612,10 +610,21 @@ describe('Staking', () => {
       res = await usdtToken.balanceOf(stakingContract.address)
       console.log('2', res)
 
+      poolInfo = await stakingContract.pools(0)
+
+      // console.log(poolInfo)
+
+      await stakingContract.connect(bob).unStake(0)
+      await network.provider.send('evm_mine')
+
       await stakingContract.connect(alice).unStake(0)
       await network.provider.send('evm_mine')
 
+      console.log(Number(await stakingContract.getRewardsWithdrawable(0)))
+
       poolInfo = await stakingContract.pools(0)
+
+      // console.log(poolInfo)
 
       expect(poolInfo.lastRewardedBlock.toNumber()).equal(14)
 
@@ -680,18 +689,26 @@ describe('Staking', () => {
       let res = await usdtToken.balanceOf(stakingContract.address)
       console.log('1', res)
 
+      const withdrawable = Number(await stakingContract.getRewardsWithdrawable(0))
+
+      console.log(withdrawable)
+
+      console.log(await stakingContract.getLatestPoolInfo(0))
+
       await stakingContract.connect(owner).failureWithdrawERC20(
         0, //
         accounts[4].address,
-        ethers.BigNumber.from(10000 * 10 ** 6).sub(70000000).toString()
+        withdrawable
       )
       await network.provider.send('evm_mine')
 
-      res = await usdtToken.balanceOf(stakingContract.address)
-      console.log('2', res)
+      res = await usdtToken.balanceOf(accounts[4].address)
+      expect(res).equal(withdrawable)
 
       await stakingContract.connect(bob).unStake(0)
       await network.provider.send('evm_mine')
+
+      console.log(Number(await stakingContract.getRewardsWithdrawable(0)))
 
       await stakingContract.connect(alice).unStake(0)
       await network.provider.send('evm_mine')
