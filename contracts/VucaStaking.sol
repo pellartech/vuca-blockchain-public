@@ -353,6 +353,7 @@ contract PellarStaking is Ownable {
     uint256 rewardsWithdrew = pool.rewardsWithdrew / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
     uint256 contractBalance = IERC20(pool.rewardToken).balanceOf(address(this));
 
+    // maximum amount withdrawal = balance - max claimable
     require(_amount + totalUserRewards <= contractBalance + rewardsWithdrew);
 
     IERC20(pool.rewardToken).transfer(_to, _amount);
