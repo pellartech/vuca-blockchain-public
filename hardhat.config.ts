@@ -6,6 +6,7 @@ import 'hardhat-gas-reporter'
 import 'solidity-coverage'
 import '@typechain/hardhat'
 import '@nomiclabs/hardhat-ethers'
+import 'solidity-coverage'
 
 config()
 
@@ -20,7 +21,7 @@ module.exports = {
         settings: {
           optimizer: {
             enabled: true,
-            runs: 9999,
+            runs: 200,
           },
         },
       },
@@ -29,7 +30,7 @@ module.exports = {
         settings: {
           optimizer: {
             enabled: true,
-            runs: 9999,
+            runs: 200,
           },
         },
       },

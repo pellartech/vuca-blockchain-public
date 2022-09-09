@@ -337,7 +337,7 @@ contract PellarStaking is Ownable {
     emit PoolUpdated(_poolId, pools[_poolId], changes, block.number);
   }
 
-  function failureWithdrawERC20(
+  function retrieveReward(
     uint256 _poolId,
     address _to,
     uint256 _amount
