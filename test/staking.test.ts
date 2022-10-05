@@ -3,7 +3,7 @@ import chai from 'chai'
 import chaiAsPromised from 'chai-as-promised'
 import { solidity } from 'ethereum-waffle'
 
-import { CWTT, CWTT__factory, PellarStaking, PellarStaking__factory, USDT, USDT__factory } from '../typechain-types'
+import { CWTT, CWTT__factory, VucaStaking, VucaStaking__factory, USDT, USDT__factory } from '../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 
 chai.use(solidity)
@@ -15,7 +15,7 @@ const TEN_E_18 = ethers.utils.parseEther('1')
 describe('Staking', () => {
   let accounts: SignerWithAddress[]
   let owner: SignerWithAddress, bob: SignerWithAddress, alice: SignerWithAddress, john: SignerWithAddress
-  let stakingContract: PellarStaking
+  let stakingContract: VucaStaking
   let cwtToken: CWTT
   let usdtToken: USDT
 
@@ -27,7 +27,7 @@ describe('Staking', () => {
     bob = accounts[1]
     alice = accounts[2]
 
-    const factory = (await ethers.getContractFactory('PellarStaking', owner)) as PellarStaking__factory
+    const factory = (await ethers.getContractFactory('VucaStaking', owner)) as VucaStaking__factory
     stakingContract = await factory.deploy()
     stakingContract.deployed()
     await network.provider.send('evm_mine')
@@ -43,8 +43,18 @@ describe('Staking', () => {
     await network.provider.send('evm_mine')
 
     await usdtToken.mint(stakingContract.address, 10000 * 10 ** 6)
-    await cwtToken.connect(bob).mint(bob.address, ethers.BigNumber.from(1000000).mul(TEN_E_18).toString())
-    await cwtToken.connect(alice).mint(alice.address, ethers.BigNumber.from(1000000).mul(TEN_E_18).toString())
+    await cwtToken.connect(bob).mint(
+      bob.address,
+      ethers.BigNumber.from(1000000)
+        .mul(TEN_E_18)
+        .toString()
+    )
+    await cwtToken.connect(alice).mint(
+      alice.address,
+      ethers.BigNumber.from(1000000)
+        .mul(TEN_E_18)
+        .toString()
+    )
     await cwtToken.connect(bob).approve(stakingContract.address, ethers.BigNumber.from('10000000000000000000000000000000000000000000'))
     await cwtToken.connect(alice).approve(stakingContract.address, ethers.BigNumber.from('10000000000000000000000000000000000000000000'))
     await network.provider.send('evm_mine')
@@ -107,7 +117,12 @@ describe('Staking', () => {
         10 * 10 ** 6,
         1
       )
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       let poolInfo = await stakingContract.pools(0)
@@ -131,7 +146,12 @@ describe('Staking', () => {
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       poolInfo = await stakingContract.pools(0)
@@ -194,7 +214,12 @@ describe('Staking', () => {
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       poolInfo = await stakingContract.pools(0)
@@ -203,7 +228,12 @@ describe('Staking', () => {
 
       await network.provider.send('evm_mine')
 
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await stakingContract.connect(bob).stake(0, 0)
       await network.provider.send('evm_mine')
 
@@ -216,7 +246,12 @@ describe('Staking', () => {
           .div(ethers.BigNumber.from(100).mul(TEN_E_18))
       )
 
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(200).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(200)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       // unStake
@@ -225,7 +260,12 @@ describe('Staking', () => {
       await stakingContract.connect(bob).unStake(0)
       await network.provider.send('evm_mine')
 
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
 
       poolInfo = await stakingContract.pools(0)
 
@@ -287,7 +327,12 @@ describe('Staking', () => {
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       poolInfo = await stakingContract.pools(0)
@@ -296,7 +341,12 @@ describe('Staking', () => {
 
       await network.provider.send('evm_mine')
 
-      await stakingContract.connect(alice).stake(0, ethers.BigNumber.from(50).mul(TEN_E_18).toString())
+      await stakingContract.connect(alice).stake(
+        0,
+        ethers.BigNumber.from(50)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       poolInfo = await stakingContract.pools(0)
@@ -373,23 +423,53 @@ describe('Staking', () => {
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       poolInfo = await stakingContract.pools(0)
       expect(poolInfo.lastRewardedBlock.toNumber()).equal(10)
       expect(poolInfo.accumulatedRewardsPerShare.toNumber()).equal(0)
 
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
-      await stakingContract.connect(alice).stake(0, ethers.BigNumber.from(300).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
+      await stakingContract.connect(alice).stake(
+        0,
+        ethers.BigNumber.from(300)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       // unStake
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
-      await stakingContract.connect(alice).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
+      await stakingContract.connect(alice).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
 
@@ -454,19 +534,44 @@ describe('Staking', () => {
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
-      await stakingContract.connect(alice).stake(0, ethers.BigNumber.from(50).mul(TEN_E_18).toString())
+      await stakingContract.connect(alice).stake(
+        0,
+        ethers.BigNumber.from(50)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       await stakingContract.connect(alice).emergencyWithdraw(0)
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       // unStake
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
-      await stakingContract.connect(alice).stake(0, ethers.BigNumber.from(50).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
+      await stakingContract.connect(alice).stake(
+        0,
+        ethers.BigNumber.from(50)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
 
@@ -531,22 +636,42 @@ describe('Staking', () => {
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
-      await stakingContract.connect(alice).stake(0, ethers.BigNumber.from(50).mul(TEN_E_18).toString())
+      await stakingContract.connect(alice).stake(
+        0,
+        ethers.BigNumber.from(50)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       // fail case
       await stakingContract.connect(owner).updateRewardTokensPerBlock(1, 20 * 10 ** 6)
       await stakingContract.connect(owner).updateRewardTokensPerBlock(0, 20 * 10 ** 6)
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
 
       // unStake
       await stakingContract.connect(owner).updateRewardTokensPerBlock(0, 5 * 10 ** 6)
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
@@ -611,7 +736,12 @@ describe('Staking', () => {
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
     })
 
@@ -658,7 +788,12 @@ describe('Staking', () => {
       await network.provider.send('evm_mine')
       await stakingContract.connect(owner).updateMaxStakeTokens(0, 1)
       await network.provider.send('evm_mine')
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
       await stakingContract.connect(owner).updateMaxStakeTokens(
         0,
@@ -668,23 +803,53 @@ describe('Staking', () => {
       )
       expect(Number(await stakingContract.getRewardsWithdrawable(0))).equal(0)
       await network.provider.send('evm_mine')
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       poolInfo = await stakingContract.pools(0)
       expect(poolInfo.lastRewardedBlock.toNumber()).equal(10)
       expect(poolInfo.accumulatedRewardsPerShare.toNumber()).equal(0)
 
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
-      await stakingContract.connect(alice).stake(0, ethers.BigNumber.from(300).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
+      await stakingContract.connect(alice).stake(
+        0,
+        ethers.BigNumber.from(300)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       // unStake
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
-      await stakingContract.connect(alice).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
+      await stakingContract.connect(alice).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
 
@@ -766,7 +931,12 @@ describe('Staking', () => {
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       poolInfo = await stakingContract.pools(0)
@@ -779,12 +949,27 @@ describe('Staking', () => {
         100 + 100
       )
 
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       await stakingContract.connect(bob).unStake(0)
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
-      await stakingContract.connect(alice).stake(0, ethers.BigNumber.from(300).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
+      await stakingContract.connect(alice).stake(
+        0,
+        ethers.BigNumber.from(300)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       // unStake
@@ -824,8 +1009,13 @@ describe('Staking', () => {
 
       await stakingContract.connect(alice).unStake(0)
       await network.provider.send('evm_mine')
-      
-      await stakingContract.connect(alice).stake(0, ethers.BigNumber.from(300).mul(TEN_E_18).toString())
+
+      await stakingContract.connect(alice).stake(
+        0,
+        ethers.BigNumber.from(300)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       poolInfo = await stakingContract.pools(0)
@@ -871,7 +1061,12 @@ describe('Staking', () => {
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       await stakingContract.connect(owner).withdrawERC20(0, accounts[4].address, 100)
@@ -880,13 +1075,28 @@ describe('Staking', () => {
       expect(poolInfo.lastRewardedBlock.toNumber()).equal(10)
       expect(poolInfo.accumulatedRewardsPerShare.toNumber()).equal(0)
 
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       await network.provider.send('evm_mine')
 
-      await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
-      await stakingContract.connect(alice).stake(0, ethers.BigNumber.from(300).mul(TEN_E_18).toString())
+      await stakingContract.connect(bob).stake(
+        0,
+        ethers.BigNumber.from(100)
+          .mul(TEN_E_18)
+          .toString()
+      )
+      await stakingContract.connect(alice).stake(
+        0,
+        ethers.BigNumber.from(300)
+          .mul(TEN_E_18)
+          .toString()
+      )
       await network.provider.send('evm_mine')
 
       // unStake

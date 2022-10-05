@@ -5,7 +5,7 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 // VUCA + Pellar + LightLink 2022
 
-contract PellarStaking is Ownable {
+contract VucaStaking is Ownable {
   // Staking user data
   struct Staking {
     uint256 amount;
