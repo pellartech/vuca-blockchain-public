@@ -3,7 +3,7 @@ import chai from 'chai'
 import chaiAsPromised from 'chai-as-promised'
 import { solidity } from 'ethereum-waffle'
 
-import { CWTToken, CWTToken__factory } from '../typechain-types'
+import { CrownToken, CrownToken__factory } from '../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 
 chai.use(solidity)
@@ -12,10 +12,10 @@ const { expect } = chai
 
 const TEN_E_18 = ethers.utils.parseEther('1')
 
-describe('CWTToken', () => {
+describe('CrownToken', () => {
   let accounts: SignerWithAddress[]
   let owner: SignerWithAddress, bob: SignerWithAddress, alice: SignerWithAddress, eve: SignerWithAddress
-  let cwtToken: CWTToken
+  let cwtToken: CrownToken
 
   beforeEach(async () => {
     await network.provider.send('hardhat_reset')
@@ -26,7 +26,7 @@ describe('CWTToken', () => {
     alice = accounts[2]
     eve = accounts[3]
 
-    const factory = (await ethers.getContractFactory('CWTToken', owner)) as CWTToken__factory
+    const factory = (await ethers.getContractFactory('CrownToken', owner)) as CrownToken__factory
     cwtToken = await factory.deploy()
     cwtToken.deployed()
     await network.provider.send('evm_mine')
