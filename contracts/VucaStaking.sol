@@ -1,0 +1,399 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.15;
+
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+
+// VUCA + Pellar + LightLink 2022
+
+contract VucaStaking is Ownable {
+  // Staking user data
+  struct Staking {
+    uint256 amount;
+    uint256 accumulatedRewards;
+    uint256 minusRewards; // rewards that user can not get computed by block
+  }
+
+  // Staking pool
+  struct Pool {
+    bool inited;
+    address rewardToken; // require init
+    address stakeToken; // require init
+    uint256 maxStakeTokens; // require init
+    uint256 startBlock; // require init
+    uint256 endBlock; // require init
+    uint256 rewardTokensPerBlock; // require init
+    uint256 tokensStaked;
+    uint256 lastRewardedBlock; // require init
+    uint256 accumulatedRewardsPerShare;
+    uint32 updateDelay; // blocks // default 2048 blocks = 8 hours
+    // admin check
+    uint256 totalUserRewards;
+    uint256 rewardsWithdrew;
+  }
+
+  struct PoolChanges {
+    bool applied;
+    uint256 maxStakeTokens;
+    uint256 endBlock;
+    uint256 rewardTokensPerBlock;
+    uint256 timestamp;
+    uint256 blockNumber;
+  }
+
+  uint256 public constant REWARDS_PRECISION = 1e18; // adjustment
+
+  uint16 public currentPoolId;
+
+  mapping(uint16 => Pool) public pools; // staking events
+
+  // Mapping poolId =>
+  mapping(uint16 => PoolChanges[]) public poolsChanges; // staking changes queue
+
+  // Mapping poolId => user address => Staking
+  mapping(uint16 => mapping(address => Staking)) public stakingUsersInfo;
+
+  // Events
+  event StakingChanged(address indexed user, uint16 indexed poolId, Pool pool, Staking staking);
+  event PoolUpdated(uint16 indexed poolId, Pool pool, PoolChanges changes, uint256 activeBlock);
+
+  // Constructor
+  constructor() {}
+
+  /* View */
+  // rewards w/o adjustment
+  function getRawRewards(uint16 _poolId, address _account) public view returns (uint256) {
+    Staking memory staking = stakingUsersInfo[_poolId][_account];
+
+    (uint256 accumulatedRewardsPerShare, , ) = getPoolRewardsCheckpoint(_poolId, block.number);
+
+    return staking.accumulatedRewards + (staking.amount * accumulatedRewardsPerShare) - staking.minusRewards;
+  }
+
+  // rewards with adjustment 
+  function getRewards(uint16 _poolId, address _account) public view returns (uint256) {
+    uint256 rawRewards = getRawRewards(_poolId, _account);
+    Pool memory pool = getLatestPoolInfo(_poolId);
+
+    return rawRewards / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+  }
+
+  // latest info
+  function getLatestPoolInfo(uint16 _poolId) public view returns (Pool memory) {
+    Pool memory pool = pools[_poolId];
+
+    uint256 size = poolsChanges[_poolId].length;
+    for (uint256 i; i < size; i++) {
+      PoolChanges memory changes = poolsChanges[_poolId][i];
+
+      if (changes.applied) {
+        continue;
+      }
+
+      uint256 updateAtBlock = changes.blockNumber + pool.updateDelay;
+      if (!(pool.endBlock > updateAtBlock && block.number >= updateAtBlock)) {
+        continue;
+      }
+
+      uint256 rewards;
+      (pool.accumulatedRewardsPerShare, pool.lastRewardedBlock, rewards) = getPoolRewardsCheckpoint(_poolId, updateAtBlock);
+      pool.totalUserRewards += rewards;
+
+      pool.maxStakeTokens = changes.maxStakeTokens;
+      pool.endBlock = changes.endBlock;
+      pool.rewardTokensPerBlock = changes.rewardTokensPerBlock;
+    }
+
+    uint256 _rewards;
+    (pool.accumulatedRewardsPerShare, pool.lastRewardedBlock, _rewards) = getPoolRewardsCheckpoint(_poolId, block.number);
+    pool.totalUserRewards += _rewards;
+
+    return pool;
+  }
+
+  // reward amt user can get on unstake
+  function getRewardsWithdrawable(uint16 _poolId) public view returns (uint256) {
+    Pool memory pool = getLatestPoolInfo(_poolId);
+
+    uint256 contractBalance = IERC20(pool.rewardToken).balanceOf(address(this));
+    if (pool.endBlock > block.number || contractBalance == 0) {
+      return 0;
+    }
+
+    uint256 totalUserRewards = pool.totalUserRewards / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+    uint256 rewardsWithdrew = pool.rewardsWithdrew / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+    return contractBalance + rewardsWithdrew - totalUserRewards;
+  }
+
+  /* User */
+  function stake(uint16 _poolId, uint256 _amount) external {
+    _updatePoolInfo(_poolId);
+    Pool storage pool = pools[_poolId];
+    require(pool.startBlock <= block.number, "Staking inactive");
+    require(pool.endBlock >= block.number, "Staking ended");
+    require(_amount > 0, "Invalid amount");
+    require(_amount + pool.tokensStaked <= pool.maxStakeTokens, "Exceed max stake tokens");
+
+    Staking storage staking = stakingUsersInfo[_poolId][msg.sender];
+
+    _updatePoolRewards(_poolId, block.number);
+    // Update user
+    staking.accumulatedRewards = getRawRewards(_poolId, msg.sender);
+    staking.amount += _amount;
+    staking.minusRewards = staking.amount * pool.accumulatedRewardsPerShare;
+
+    // Update pool
+    pool.tokensStaked += _amount;
+
+    // Deposit tokens
+    emit StakingChanged(msg.sender, _poolId, pool, staking);
+    IERC20(pool.stakeToken).transferFrom(address(msg.sender), address(this), _amount);
+  }
+
+  // if user withdraws before staking period ends, they forfeit all rewards
+  function emergencyWithdraw(uint16 _poolId) external {
+    _updatePoolInfo(_poolId);
+    Pool storage pool = pools[_poolId];
+    Staking storage staking = stakingUsersInfo[_poolId][msg.sender];
+    uint256 amount = staking.amount;
+    require(staking.amount > 0, "Insufficient funds");
+
+    _updatePoolRewards(_poolId, block.number);
+    // Update pool
+    if (pool.tokensStaked >= amount) {
+      pool.tokensStaked -= amount;
+    }
+
+    staking.amount = 0;
+
+    // Withdraw tokens
+    IERC20(pool.stakeToken).transfer(address(msg.sender), amount);
+
+    emit StakingChanged(msg.sender, _poolId, pool, staking);
+
+    // Update staker
+    staking.accumulatedRewards = 0;
+    staking.minusRewards = 0;
+  }
+
+  // unstake, get rewards
+  function unStake(uint16 _poolId) external {
+    _updatePoolInfo(_poolId);
+    Pool storage pool = pools[_poolId];
+    require(pool.endBlock <= block.number, "Staking active");
+
+    Staking storage staking = stakingUsersInfo[_poolId][msg.sender];
+    uint256 amount = staking.amount;
+    require(staking.amount > 0, "Insufficient funds");
+
+    _updatePoolRewards(_poolId, block.number);
+    // Pay rewards
+    uint256 rewards = getRewards(_poolId, msg.sender);
+    IERC20(pool.rewardToken).transfer(msg.sender, rewards);
+
+    // Update pool
+    pool.rewardsWithdrew += getRawRewards(_poolId, msg.sender);
+    if (pool.tokensStaked >= amount) {
+      pool.tokensStaked -= amount;
+    }
+
+    // Withdraw tokens
+    IERC20(pool.stakeToken).transfer(address(msg.sender), amount);
+
+    emit StakingChanged(msg.sender, _poolId, pool, staking);
+
+    // Update staker
+    staking.accumulatedRewards = 0;
+    staking.minusRewards = 0;
+    staking.amount = 0;
+  }
+
+  // reward amount at block number x
+  function getPoolRewardsCheckpoint(uint16 _poolId, uint256 _blockNumber)
+    public
+    view
+    returns (
+      uint256 accumulatedRewardsPerShare,
+      uint256 lastRewardedBlock,
+      uint256 rewards
+    )
+  {
+    Pool memory pool = pools[_poolId];
+
+    uint256 floorBlock = _blockNumber <= pool.endBlock ? _blockNumber : pool.endBlock;
+
+    uint256 blocksSinceLastReward;
+    if (floorBlock >= pool.lastRewardedBlock) {
+      blocksSinceLastReward = floorBlock - pool.lastRewardedBlock;
+    }
+    rewards = blocksSinceLastReward * pool.rewardTokensPerBlock;
+    if (pool.tokensStaked > 0) {
+      accumulatedRewardsPerShare = pool.accumulatedRewardsPerShare + (rewards / pool.tokensStaked);
+    }
+    lastRewardedBlock = floorBlock;
+  }
+
+  /* Admin */
+  function createPool(
+    address _rewardToken,
+    address _stakeToken,
+    uint256 _maxStakeTokens,
+    uint256 _startBlock,
+    uint256 _endBlock,
+    uint256 _rewardTokensPerBlock,
+    uint32 _updateDelay
+  ) external onlyOwner {
+    require(_startBlock > 0 && _startBlock < _endBlock, "Invalid start/end block");
+    require(_rewardToken != address(0), "Invalid reward token");
+    require(_stakeToken != address(0), "Invalid reward token");
+
+    pools[currentPoolId].inited = true;
+    pools[currentPoolId].rewardToken = _rewardToken;
+    pools[currentPoolId].stakeToken = _stakeToken;
+
+    pools[currentPoolId].maxStakeTokens = _maxStakeTokens;
+    pools[currentPoolId].startBlock = _startBlock;
+    pools[currentPoolId].endBlock = _endBlock;
+
+    pools[currentPoolId].rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20(_stakeToken).decimals()) * REWARDS_PRECISION;
+    pools[currentPoolId].lastRewardedBlock = _startBlock;
+    pools[currentPoolId].updateDelay = _updateDelay; // = 8 hours;
+
+    PoolChanges memory changes;
+
+    emit PoolUpdated(currentPoolId, pools[currentPoolId], changes, block.number);
+    currentPoolId += 1;
+  }
+
+  function updateMaxStakeTokens(uint16 _poolId, uint256 _maxStakeTokens) external onlyOwner {
+    require(pools[_poolId].inited, "Invalid Pool");
+    require(block.number + pools[_poolId].updateDelay < pools[_poolId].endBlock, "Exceed Blocks");
+
+    PoolChanges memory changes = PoolChanges({ applied: false, rewardTokensPerBlock: pools[_poolId].rewardTokensPerBlock, endBlock: pools[_poolId].endBlock, maxStakeTokens: _maxStakeTokens, timestamp: block.timestamp, blockNumber: block.number });
+    poolsChanges[_poolId].push(changes);
+
+    emit PoolUpdated(_poolId, pools[_poolId], changes, block.number + pools[_poolId].updateDelay);
+  }
+
+  function updateRewardTokensPerBlock(uint16 _poolId, uint256 _rewardTokensPerBlock) external onlyOwner {
+    require(pools[_poolId].inited, "Invalid Pool");
+    require(block.number + pools[_poolId].updateDelay < pools[_poolId].endBlock, "Exceed Blocks");
+
+    uint256 rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20(pools[_poolId].stakeToken).decimals()) * REWARDS_PRECISION;
+
+    PoolChanges memory changes = PoolChanges({ applied: false, rewardTokensPerBlock: rewardTokensPerBlock, endBlock: pools[_poolId].endBlock, maxStakeTokens: pools[_poolId].maxStakeTokens, timestamp: block.timestamp, blockNumber: block.number });
+    poolsChanges[_poolId].push(changes);
+
+    emit PoolUpdated(_poolId, pools[_poolId], changes, block.number + pools[_poolId].updateDelay);
+  }
+
+  // end block updatable
+  function updateEndBlock(uint16 _poolId, uint256 _endBlock) external onlyOwner {
+    require(pools[_poolId].inited, "Invalid Pool");
+    require(block.number <= _endBlock, "Invalid input");
+    require(block.number + pools[_poolId].updateDelay < pools[_poolId].endBlock, "Exceed Blocks");
+
+    PoolChanges memory changes = PoolChanges({ applied: false, rewardTokensPerBlock: pools[_poolId].rewardTokensPerBlock, endBlock: _endBlock, maxStakeTokens: pools[_poolId].maxStakeTokens, timestamp: block.timestamp, blockNumber: block.number });
+    poolsChanges[_poolId].push(changes);
+
+    emit PoolUpdated(_poolId, pools[_poolId], changes, block.number + pools[_poolId].updateDelay);
+  }
+
+  /* @Dev only, remove in prod */
+  function updateChangesDelayBlocks(uint16 _poolId, uint32 _blocks) external onlyOwner {
+    require(pools[_poolId].inited, "Invalid Pool");
+
+    pools[_poolId].updateDelay = _blocks;
+    PoolChanges memory changes;
+
+    emit PoolUpdated(_poolId, pools[_poolId], changes, block.number);
+  }
+
+  // withdraw reward token held in contract
+  function retrieveReward(
+    uint16 _poolId,
+    address _to,
+    uint256 _amount
+  ) external onlyOwner {
+    _updatePoolInfo(_poolId);
+    Pool memory pool = pools[_poolId];
+    require(pool.endBlock <= block.number, "Staking active");
+
+    _updatePoolRewards(_poolId, block.number);
+    pool = pools[_poolId];
+
+    uint256 totalUserRewards = pool.totalUserRewards / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+    uint256 rewardsWithdrew = pool.rewardsWithdrew / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+    uint256 contractBalance = IERC20(pool.rewardToken).balanceOf(address(this));
+
+    // maximum amount withdrawal = balance - max claimable
+    require(_amount + totalUserRewards <= contractBalance + rewardsWithdrew);
+
+    IERC20(pool.rewardToken).transfer(_to, _amount);
+  }
+
+  // for admin to withdraw tokens
+  function withdrawERC20(
+    uint16 _poolId,
+    address _to,
+    uint256 _amount
+  ) external onlyOwner {
+    _updatePoolInfo(_poolId);
+    Pool memory pool = pools[_poolId];
+    require(pool.endBlock <= block.number, "Staking active");
+    require(pool.tokensStaked == 0, "Not allowed");
+
+    IERC20(pool.rewardToken).transfer(_to, _amount);
+  }
+
+  /* Internal */
+  function _updatePoolInfo(uint16 _poolId) internal {
+    Pool storage pool = pools[_poolId];
+
+    uint256 size = poolsChanges[_poolId].length;
+    for (uint256 i; i < size; i++) {
+      PoolChanges storage changes = poolsChanges[_poolId][i];
+
+      if (changes.applied) {
+        continue;
+      }
+
+      uint256 updateAtBlock = changes.blockNumber + pool.updateDelay;
+      if (!(pool.endBlock > updateAtBlock && block.number >= updateAtBlock)) {
+        continue;
+      }
+
+      _updatePoolRewards(_poolId, updateAtBlock);
+      pool.maxStakeTokens = changes.maxStakeTokens;
+      pool.endBlock = changes.endBlock;
+      pool.rewardTokensPerBlock = changes.rewardTokensPerBlock;
+      changes.applied = true;
+    }
+  }
+
+  function _updatePoolRewards(uint16 _poolId, uint256 _blockNumber) internal {
+    Pool storage pool = pools[_poolId];
+
+    if (pool.tokensStaked == 0 && _blockNumber < pool.endBlock) {
+      pool.lastRewardedBlock = _blockNumber;
+      return;
+    }
+
+    uint256 rewards;
+    (pool.accumulatedRewardsPerShare, pool.lastRewardedBlock, rewards) = getPoolRewardsCheckpoint(_poolId, _blockNumber);
+    pool.totalUserRewards += rewards;
+  }
+}
+
+interface IERC20 {
+  function transferFrom(
+    address from,
+    address to,
+    uint256 amount
+  ) external returns (bool);
+
+  function transfer(address to, uint256 amount) external returns (bool);
+
+  function decimals() external view returns (uint8);
+
+  function balanceOf(address account) external view returns (uint256);
+}
