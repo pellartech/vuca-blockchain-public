@@ -1,5 +1,7 @@
 Contracts associated with the ADOT Crown Token Project.
 
+We use Hardhat to deploy and test our contracts to the Goerli Test Network.
+
 Last Updated: 20/9/2022
 
 Includes
