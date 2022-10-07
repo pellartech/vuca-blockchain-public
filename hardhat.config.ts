@@ -21,20 +21,20 @@ module.exports = {
         settings: {
           optimizer: {
             enabled: true,
-            runs: 200,
-          },
-        },
+            runs: 200
+          }
+        }
       },
       {
         version: '0.8.13',
         settings: {
           optimizer: {
             enabled: true,
-            runs: 200,
-          },
-        },
-      },
-    ],
+            runs: 200
+          }
+        }
+      }
+    ]
   },
   networks: {
     hardhat: {
@@ -43,34 +43,34 @@ module.exports = {
       accounts: require('./accounts.json'),
       mining: {
         auto: false,
-        interval: 0,
-      },
+        interval: 0
+      }
     },
     goerli: {
       url: process.env.GOERLI_PROVIDER_URL,
-      accounts: [process.env.GOERLI_PRIVATE_KEY],
-    },
-    rinkeby: {
-      url: process.env.RINKEBY_PROVIDER_URL,
-      accounts: [process.env.RINKEBY_PRIVATE_KEY],
-    },
-    mainnet: {
-      url: process.env.MAINNET_PROVIDER_URL,
-      accounts: [process.env.MAINNET_PRIVATE_KEY],
-    },
+      accounts: [process.env.GOERLI_PRIVATE_KEY]
+    }
+    // rinkeby: {
+    //   url: process.env.RINKEBY_PROVIDER_URL,
+    //   accounts: [process.env.RINKEBY_PRIVATE_KEY],
+    // },
+    // mainnet: {
+    //   url: process.env.MAINNET_PROVIDER_URL,
+    //   accounts: [process.env.MAINNET_PRIVATE_KEY],
+    // },
   },
   mocha: {
-    timeout: 200000,
+    timeout: 200000
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
-    currency: 'USD',
+    currency: 'USD'
   },
   etherscan: {
     apiKey: {
       mainnet: process.env.ETHEREUM_API_KEY,
       goerli: process.env.ETHEREUM_API_KEY,
-      rinkeby: process.env.ETHEREUM_API_KEY,
-    },
-  },
+      rinkeby: process.env.ETHEREUM_API_KEY
+    }
+  }
 }
