@@ -5,8 +5,6 @@ import { VucaOwnable } from "./VucaOwnable.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import "hardhat/console.sol";
-
 // VUCA + Pellar + LightLink 2022
 
 contract VucaStaking is VucaOwnable {
