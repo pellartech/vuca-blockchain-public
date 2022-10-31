@@ -5,6 +5,8 @@ import { VucaOwnable } from "./VucaOwnable.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import "hardhat/console.sol";
+
 // VUCA + Pellar + LightLink 2022
 
 contract VucaStaking is VucaOwnable {
@@ -24,6 +26,13 @@ contract VucaStaking is VucaOwnable {
     uint256 minusRewards; // rewards that user can not get computed by block
   }
 
+  struct Extension {
+    uint256 totalUserRewards;
+    uint256 rewardsWithdrew;
+    uint256 totalPoolRewards;
+    uint256 noAddressRewards;
+  }
+
   // Staking pool
   struct Pool {
     bool inited;
@@ -37,9 +46,7 @@ contract VucaStaking is VucaOwnable {
     uint256 lastRewardedBlock; // require init
     uint256 accumulatedRewardsPerShare;
     uint32 updateDelay; // blocks // default 2048 blocks = 8 hours
-    // admin check
-    uint256 totalUserRewards;
-    uint256 rewardsWithdrew;
+    Extension extension;
   }
 
   struct PoolChanges {
@@ -63,8 +70,10 @@ contract VucaStaking is VucaOwnable {
   mapping(uint16 => mapping(address => Staking)) public stakingUsersInfo;
 
   // Events
-  event StakingChanged(address indexed user, uint16 indexed poolId, Pool pool, Staking staking);
-  event PoolUpdated(uint16 indexed poolId, Pool pool, PoolChanges changes, uint256 activeBlock);
+  event StakingChanged(string eventName, address indexed user, uint16 indexed poolId, Pool pool, Staking staking);
+  event RewardsRetrived(string eventName, uint16 indexed poolId, uint256 amount);
+  event PoolCreated(string eventName, uint16 indexed poolId, Pool pool, uint256 activeBlock);
+  event PoolUpdated(string eventName, uint16 indexed poolId, Pool pool, PoolChanges changes, uint256 activeBlock);
 
   // Constructor
   constructor() {}
@@ -85,51 +94,6 @@ contract VucaStaking is VucaOwnable {
     uint256 rawRewards = getRawRewards(_poolId, _account);
 
     return rawRewards / (10**IERC20Helper(pools[_poolId].stakeToken).decimals()) / REWARDS_PRECISION;
-  }
-
-  // latest info
-  function getLatestPoolInfo(uint16 _poolId) public view returns (Pool memory) {
-    Pool memory pool = pools[_poolId];
-
-    uint256 size = poolsChanges[_poolId].length;
-    for (uint256 i; i < size; i++) {
-      PoolChanges memory changes = poolsChanges[_poolId][i];
-
-      if (changes.applied) {
-        continue;
-      }
-
-      uint256 updateAtBlock = changes.blockNumber + pool.updateDelay;
-      if (!(pool.endBlock > updateAtBlock && block.number >= updateAtBlock)) {
-        continue;
-      }
-
-      pool = _getPoolRewards(pool, updateAtBlock);
-
-      if (changes.updateParamId == UpdateParam.MaxStakeTokens) {
-        pool.maxStakeTokens = changes.updateParamValue;
-      } else if (changes.updateParamId == UpdateParam.EndBlock) {
-        pool.endBlock = changes.updateParamValue;
-      } else if (changes.updateParamId == UpdateParam.RewardTokensPerBlock) {
-        pool.rewardTokensPerBlock = changes.updateParamValue;
-      }
-    }
-
-    pool = _getPoolRewards(pool, block.number);
-    return pool;
-  }
-
-  function getRewardsWithdrawable(uint16 _poolId) public view returns (uint256) {
-    Pool memory pool = getLatestPoolInfo(_poolId);
-
-    uint256 contractBalance = IERC20Helper(pool.rewardToken).balanceOf(address(this));
-    if (pool.endBlock > block.number || contractBalance == 0) {
-      return 0;
-    }
-
-    uint256 totalUserRewards = pool.totalUserRewards / (10**IERC20Helper(pool.stakeToken).decimals()) / REWARDS_PRECISION;
-    uint256 rewardsWithdrew = pool.rewardsWithdrew / (10**IERC20Helper(pool.stakeToken).decimals()) / REWARDS_PRECISION;
-    return contractBalance + rewardsWithdrew - totalUserRewards;
   }
 
   /* User */
@@ -153,7 +117,7 @@ contract VucaStaking is VucaOwnable {
     pool.tokensStaked += _amount;
 
     // Deposit tokens
-    emit StakingChanged(msg.sender, _poolId, pool, staking);
+    emit StakingChanged("StakingChanged", msg.sender, _poolId, pool, staking);
     IERC20(pool.stakeToken).safeTransferFrom(address(msg.sender), address(this), _amount);
   }
 
@@ -166,12 +130,14 @@ contract VucaStaking is VucaOwnable {
     require(staking.amount > 0, "Insufficient funds");
 
     _updatePoolRewards(_poolId, block.number);
+    uint256 rewards = getRewards(_poolId, msg.sender);
     // Update pool
     pool.tokensStaked -= amount;
+    pool.extension.noAddressRewards += rewards;
 
     staking.amount = 0;
 
-    emit StakingChanged(msg.sender, _poolId, pool, staking);
+    emit StakingChanged("StakingChanged", msg.sender, _poolId, pool, staking);
 
     // Update staker
     staking.accumulatedRewards = 0;
@@ -195,10 +161,9 @@ contract VucaStaking is VucaOwnable {
     uint256 rewards = getRewards(_poolId, msg.sender);
 
     // Update pool
-    pool.rewardsWithdrew += getRawRewards(_poolId, msg.sender);
     pool.tokensStaked -= amount;
 
-    emit StakingChanged(msg.sender, _poolId, pool, staking);
+    emit StakingChanged("StakingChanged", msg.sender, _poolId, pool, staking);
 
     // Update staker
     staking.accumulatedRewards = 0;
@@ -239,10 +204,28 @@ contract VucaStaking is VucaOwnable {
     pools[currentPoolId].lastRewardedBlock = _startBlock;
     pools[currentPoolId].updateDelay = _updateDelay; // = 8 hours;
 
+    emit PoolCreated("PoolCreated", currentPoolId, pools[currentPoolId], block.number);
+    currentPoolId += 1;
+  }
+
+  function depositPoolReward(uint16 _poolId) public {
+    Pool storage pool = pools[_poolId];
+    require(pool.inited, "Pool invalid");
+
+    uint256 rewardTokenPerBlock = pool.rewardTokensPerBlock / (10**IERC20Helper(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+    uint256 totalPoolRewards = rewardTokenPerBlock * (pool.endBlock - pool.startBlock + 1);
+
+    require(totalPoolRewards > pool.extension.totalPoolRewards, "Already deposited");
+
+    uint256 amount = totalPoolRewards - pool.extension.totalPoolRewards;
+
+    IERC20(pool.rewardToken).safeTransferFrom(msg.sender, address(this), amount);
+
+    pool.extension.totalPoolRewards = totalPoolRewards;
+
     PoolChanges memory changes;
 
-    emit PoolUpdated(currentPoolId, pools[currentPoolId], changes, block.number);
-    currentPoolId += 1;
+    emit PoolUpdated("PoolUpdated", currentPoolId, pools[_poolId], changes, block.number);
   }
 
   function updateMaxStakeTokens(uint16 _poolId, uint256 _maxStakeTokens) external onlyOwner {
@@ -258,7 +241,7 @@ contract VucaStaking is VucaOwnable {
     });
     poolsChanges[_poolId].push(changes);
 
-    emit PoolUpdated(_poolId, pools[_poolId], changes, block.number + pools[_poolId].updateDelay);
+    emit PoolUpdated("PoolUpdated", _poolId, pools[_poolId], changes, block.number + pools[_poolId].updateDelay);
   }
 
   function updateRewardTokensPerBlock(uint16 _poolId, uint256 _rewardTokensPerBlock) external onlyOwner {
@@ -276,7 +259,7 @@ contract VucaStaking is VucaOwnable {
     });
     poolsChanges[_poolId].push(changes);
 
-    emit PoolUpdated(_poolId, pools[_poolId], changes, block.number + pools[_poolId].updateDelay);
+    emit PoolUpdated("PoolUpdated", _poolId, pools[_poolId], changes, block.number + pools[_poolId].updateDelay);
   }
 
   // end block updatable
@@ -294,7 +277,7 @@ contract VucaStaking is VucaOwnable {
     });
     poolsChanges[_poolId].push(changes);
 
-    emit PoolUpdated(_poolId, pools[_poolId], changes, block.number + pools[_poolId].updateDelay);
+    emit PoolUpdated("PoolUpdated", _poolId, pools[_poolId], changes, block.number + pools[_poolId].updateDelay);
   }
 
   /* @Dev only, remove in prod */
@@ -304,30 +287,33 @@ contract VucaStaking is VucaOwnable {
     pools[_poolId].updateDelay = _blocks;
     PoolChanges memory changes;
 
-    emit PoolUpdated(_poolId, pools[_poolId], changes, block.number);
+    emit PoolUpdated("PoolUpdated", _poolId, pools[_poolId], changes, block.number);
   }
 
   // withdraw reward token held in contract
-  function retrieveReward(
-    uint16 _poolId,
-    address _to,
-    uint256 _amount
-  ) external onlyOwner {
+  function retrieveReward(uint16 _poolId, address _to) external onlyOwner {
     _updatePoolInfo(_poolId);
-    Pool memory pool = pools[_poolId];
-    require(pool.endBlock <= block.number, "Staking active");
+    Pool storage pool = pools[_poolId];
+    require(pool.endBlock < block.number, "Staking active");
 
     _updatePoolRewards(_poolId, block.number);
     pool = pools[_poolId];
 
-    uint256 totalUserRewards = pool.totalUserRewards / (10**IERC20Helper(pool.stakeToken).decimals()) / REWARDS_PRECISION;
-    uint256 rewardsWithdrew = pool.rewardsWithdrew / (10**IERC20Helper(pool.stakeToken).decimals()) / REWARDS_PRECISION;
-    uint256 contractBalance = IERC20Helper(pool.rewardToken).balanceOf(address(this));
+    uint256 totalPoolRewards = pool.extension.totalPoolRewards;
+    uint256 noAddressRewards = pool.extension.noAddressRewards;
+    uint256 rewardsWithdrew = pool.extension.rewardsWithdrew;
 
-    // maximum amount withdrawal = balance - max claimable
-    require(_amount + totalUserRewards <= contractBalance + rewardsWithdrew, "Insufficient pool rewards");
+    uint256 totalUserRewards = pool.extension.totalUserRewards / (10**IERC20Helper(pool.stakeToken).decimals()) / REWARDS_PRECISION;
 
-    IERC20(pool.rewardToken).safeTransfer(_to, _amount);
+    require(totalPoolRewards + noAddressRewards > totalUserRewards + rewardsWithdrew, "Insufficient pool rewards");
+
+    uint256 amount = totalPoolRewards + noAddressRewards - totalUserRewards - rewardsWithdrew;
+
+    pool.extension.rewardsWithdrew += amount;
+
+    emit RewardsRetrived('RewardsRetrived', _poolId, amount);
+
+    IERC20(pool.rewardToken).safeTransfer(_to, amount);
   }
 
   /* Internal */
@@ -366,7 +352,7 @@ contract VucaStaking is VucaOwnable {
 
     pool.accumulatedRewardsPerShare = newPool.accumulatedRewardsPerShare;
     pool.lastRewardedBlock = newPool.lastRewardedBlock;
-    pool.totalUserRewards = newPool.totalUserRewards;
+    pool.extension.totalUserRewards = newPool.extension.totalUserRewards;
     pool.lastRewardedBlock = newPool.lastRewardedBlock;
   }
 
@@ -385,7 +371,7 @@ contract VucaStaking is VucaOwnable {
     uint256 rewards = blocksSinceLastReward * _pool.rewardTokensPerBlock;
     _pool.accumulatedRewardsPerShare = _pool.accumulatedRewardsPerShare + (rewards / _pool.tokensStaked);
     _pool.lastRewardedBlock = floorBlock;
-    _pool.totalUserRewards += rewards;
+    _pool.extension.totalUserRewards += rewards;
 
     return _pool;
   }
