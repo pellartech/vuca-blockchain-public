@@ -25,6 +25,7 @@ contract VucaStaking is VucaOwnable {
   }
 
   struct Extension {
+    uint256 currentPoolChangeId;
     uint256 totalUserRewards;
     uint256 rewardsWithdrew;
     uint256 totalPoolRewards;
@@ -69,7 +70,7 @@ contract VucaStaking is VucaOwnable {
 
   // Events
   event StakingChanged(string eventName, address indexed user, uint16 indexed poolId, Pool pool, Staking staking);
-  event RewardsRetrived(string eventName, uint16 indexed poolId, uint256 amount);
+  event RewardsRetrieved(string eventName, uint16 indexed poolId, uint256 amount);
   event PoolCreated(string eventName, uint16 indexed poolId, Pool pool, uint256 activeBlock);
   event PoolUpdated(string eventName, uint16 indexed poolId, Pool pool, PoolChanges changes, uint256 activeBlock);
 
@@ -230,6 +231,10 @@ contract VucaStaking is VucaOwnable {
     require(pools[_poolId].inited, "Invalid Pool");
     require(block.number + pools[_poolId].updateDelay < pools[_poolId].endBlock, "Exceed Blocks");
 
+    _updatePoolInfo(_poolId);
+
+    require(pools[_poolId].extension.currentPoolChangeId + 10 > poolsChanges[_poolId].length, "Exceed pending changes");
+
     PoolChanges memory changes = PoolChanges({
       applied: false, //
       updateParamId: UpdateParam.MaxStakeTokens,
@@ -245,6 +250,10 @@ contract VucaStaking is VucaOwnable {
   function updateRewardTokensPerBlock(uint16 _poolId, uint256 _rewardTokensPerBlock) external onlyOwner {
     require(pools[_poolId].inited, "Invalid Pool");
     require(block.number + pools[_poolId].updateDelay < pools[_poolId].endBlock, "Exceed Blocks");
+
+    _updatePoolInfo(_poolId);
+
+    require(pools[_poolId].extension.currentPoolChangeId + 10 > poolsChanges[_poolId].length, "Exceed pending changes");
 
     uint256 rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20Helper(pools[_poolId].stakeToken).decimals()) * REWARDS_PRECISION;
 
@@ -265,6 +274,10 @@ contract VucaStaking is VucaOwnable {
     require(pools[_poolId].inited, "Invalid Pool");
     require(_endBlock > block.number + pools[_poolId].updateDelay, "Invalid input");
     require(block.number + pools[_poolId].updateDelay < pools[_poolId].endBlock, "Exceed Blocks");
+
+    _updatePoolInfo(_poolId);
+
+    require(pools[_poolId].extension.currentPoolChangeId + 10 > poolsChanges[_poolId].length, "Exceed pending changes");
 
     PoolChanges memory changes = PoolChanges({
       applied: false, //
@@ -309,7 +322,7 @@ contract VucaStaking is VucaOwnable {
 
     pool.extension.rewardsWithdrew += amount;
 
-    emit RewardsRetrived('RewardsRetrived', _poolId, amount);
+    emit RewardsRetrieved('RewardsRetrieved', _poolId, amount);
 
     IERC20(pool.rewardToken).safeTransfer(_to, amount);
   }
@@ -319,7 +332,8 @@ contract VucaStaking is VucaOwnable {
     Pool storage pool = pools[_poolId];
 
     uint256 size = poolsChanges[_poolId].length;
-    for (uint256 i; i < size; i++) {
+    uint256 i = pool.extension.currentPoolChangeId;
+    for (i = pool.extension.currentPoolChangeId; i < size; i++) {
       PoolChanges storage changes = poolsChanges[_poolId][i];
 
       if (changes.applied) {
@@ -328,7 +342,7 @@ contract VucaStaking is VucaOwnable {
 
       uint256 updateAtBlock = changes.blockNumber + pool.updateDelay;
       if (!(pool.endBlock > updateAtBlock && block.number >= updateAtBlock)) {
-        continue;
+        break;
       }
 
       _updatePoolRewards(_poolId, updateAtBlock);
@@ -341,6 +355,7 @@ contract VucaStaking is VucaOwnable {
       }
       changes.applied = true;
     }
+    pool.extension.currentPoolChangeId = i;
   }
 
   function _updatePoolRewards(uint16 _poolId, uint256 _blockNumber) internal {
