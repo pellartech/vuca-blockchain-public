@@ -1,11 +1,22 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.15;
+pragma solidity 0.8.17;
 
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { VucaOwnable } from "./VucaOwnable.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // VUCA + Pellar + LightLink 2022
 
-contract VucaStaking is Ownable {
+contract VucaStaking is VucaOwnable {
+  using SafeERC20 for IERC20;
+
+  // constants
+  enum UpdateParam {
+    MaxStakeTokens,
+    RewardTokensPerBlock,
+    EndBlock
+  }
+
   // Staking user data
   struct Staking {
     uint256 amount;
@@ -33,9 +44,8 @@ contract VucaStaking is Ownable {
 
   struct PoolChanges {
     bool applied;
-    uint256 maxStakeTokens;
-    uint256 endBlock;
-    uint256 rewardTokensPerBlock;
+    UpdateParam updateParamId;
+    uint256 updateParamValue;
     uint256 timestamp;
     uint256 blockNumber;
   }
@@ -63,18 +73,18 @@ contract VucaStaking is Ownable {
   // rewards w/o adjustment
   function getRawRewards(uint16 _poolId, address _account) public view returns (uint256) {
     Staking memory staking = stakingUsersInfo[_poolId][_account];
+    Pool memory pool = pools[_poolId];
 
-    (uint256 accumulatedRewardsPerShare, , ) = getPoolRewardsCheckpoint(_poolId, block.number);
+    pool = _getPoolRewards(pool, block.number);
 
-    return staking.accumulatedRewards + (staking.amount * accumulatedRewardsPerShare) - staking.minusRewards;
+    return staking.accumulatedRewards + (staking.amount * pool.accumulatedRewardsPerShare) - staking.minusRewards;
   }
 
-  // rewards with adjustment 
+  // rewards with adjustment
   function getRewards(uint16 _poolId, address _account) public view returns (uint256) {
     uint256 rawRewards = getRawRewards(_poolId, _account);
-    Pool memory pool = getLatestPoolInfo(_poolId);
 
-    return rawRewards / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+    return rawRewards / (10**IERC20Helper(pools[_poolId].stakeToken).decimals()) / REWARDS_PRECISION;
   }
 
   // latest info
@@ -94,33 +104,31 @@ contract VucaStaking is Ownable {
         continue;
       }
 
-      uint256 rewards;
-      (pool.accumulatedRewardsPerShare, pool.lastRewardedBlock, rewards) = getPoolRewardsCheckpoint(_poolId, updateAtBlock);
-      pool.totalUserRewards += rewards;
+      pool = _getPoolRewards(pool, updateAtBlock);
 
-      pool.maxStakeTokens = changes.maxStakeTokens;
-      pool.endBlock = changes.endBlock;
-      pool.rewardTokensPerBlock = changes.rewardTokensPerBlock;
+      if (changes.updateParamId == UpdateParam.MaxStakeTokens) {
+        pool.maxStakeTokens = changes.updateParamValue;
+      } else if (changes.updateParamId == UpdateParam.EndBlock) {
+        pool.endBlock = changes.updateParamValue;
+      } else if (changes.updateParamId == UpdateParam.RewardTokensPerBlock) {
+        pool.rewardTokensPerBlock = changes.updateParamValue;
+      }
     }
 
-    uint256 _rewards;
-    (pool.accumulatedRewardsPerShare, pool.lastRewardedBlock, _rewards) = getPoolRewardsCheckpoint(_poolId, block.number);
-    pool.totalUserRewards += _rewards;
-
+    pool = _getPoolRewards(pool, block.number);
     return pool;
   }
 
-  // reward amt user can get on unstake
   function getRewardsWithdrawable(uint16 _poolId) public view returns (uint256) {
     Pool memory pool = getLatestPoolInfo(_poolId);
 
-    uint256 contractBalance = IERC20(pool.rewardToken).balanceOf(address(this));
+    uint256 contractBalance = IERC20Helper(pool.rewardToken).balanceOf(address(this));
     if (pool.endBlock > block.number || contractBalance == 0) {
       return 0;
     }
 
-    uint256 totalUserRewards = pool.totalUserRewards / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
-    uint256 rewardsWithdrew = pool.rewardsWithdrew / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+    uint256 totalUserRewards = pool.totalUserRewards / (10**IERC20Helper(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+    uint256 rewardsWithdrew = pool.rewardsWithdrew / (10**IERC20Helper(pool.stakeToken).decimals()) / REWARDS_PRECISION;
     return contractBalance + rewardsWithdrew - totalUserRewards;
   }
 
@@ -146,7 +154,7 @@ contract VucaStaking is Ownable {
 
     // Deposit tokens
     emit StakingChanged(msg.sender, _poolId, pool, staking);
-    IERC20(pool.stakeToken).transferFrom(address(msg.sender), address(this), _amount);
+    IERC20(pool.stakeToken).safeTransferFrom(address(msg.sender), address(this), _amount);
   }
 
   // if user withdraws before staking period ends, they forfeit all rewards
@@ -159,45 +167,36 @@ contract VucaStaking is Ownable {
 
     _updatePoolRewards(_poolId, block.number);
     // Update pool
-    if (pool.tokensStaked >= amount) {
-      pool.tokensStaked -= amount;
-    }
+    pool.tokensStaked -= amount;
 
     staking.amount = 0;
-
-    // Withdraw tokens
-    IERC20(pool.stakeToken).transfer(address(msg.sender), amount);
 
     emit StakingChanged(msg.sender, _poolId, pool, staking);
 
     // Update staker
     staking.accumulatedRewards = 0;
     staking.minusRewards = 0;
+
+    // Withdraw tokens
+    IERC20(pool.stakeToken).safeTransfer(address(msg.sender), amount);
   }
 
   // unstake, get rewards
   function unStake(uint16 _poolId) external {
     _updatePoolInfo(_poolId);
     Pool storage pool = pools[_poolId];
-    require(pool.endBlock <= block.number, "Staking active");
+    require(pool.endBlock < block.number, "Staking active");
 
     Staking storage staking = stakingUsersInfo[_poolId][msg.sender];
     uint256 amount = staking.amount;
     require(staking.amount > 0, "Insufficient funds");
 
     _updatePoolRewards(_poolId, block.number);
-    // Pay rewards
     uint256 rewards = getRewards(_poolId, msg.sender);
-    IERC20(pool.rewardToken).transfer(msg.sender, rewards);
 
     // Update pool
     pool.rewardsWithdrew += getRawRewards(_poolId, msg.sender);
-    if (pool.tokensStaked >= amount) {
-      pool.tokensStaked -= amount;
-    }
-
-    // Withdraw tokens
-    IERC20(pool.stakeToken).transfer(address(msg.sender), amount);
+    pool.tokensStaked -= amount;
 
     emit StakingChanged(msg.sender, _poolId, pool, staking);
 
@@ -205,31 +204,12 @@ contract VucaStaking is Ownable {
     staking.accumulatedRewards = 0;
     staking.minusRewards = 0;
     staking.amount = 0;
-  }
 
-  // reward amount at block number x
-  function getPoolRewardsCheckpoint(uint16 _poolId, uint256 _blockNumber)
-    public
-    view
-    returns (
-      uint256 accumulatedRewardsPerShare,
-      uint256 lastRewardedBlock,
-      uint256 rewards
-    )
-  {
-    Pool memory pool = pools[_poolId];
+    // Pay rewards
+    IERC20(pool.rewardToken).safeTransfer(msg.sender, rewards);
 
-    uint256 floorBlock = _blockNumber <= pool.endBlock ? _blockNumber : pool.endBlock;
-
-    uint256 blocksSinceLastReward;
-    if (floorBlock >= pool.lastRewardedBlock) {
-      blocksSinceLastReward = floorBlock - pool.lastRewardedBlock;
-    }
-    rewards = blocksSinceLastReward * pool.rewardTokensPerBlock;
-    if (pool.tokensStaked > 0) {
-      accumulatedRewardsPerShare = pool.accumulatedRewardsPerShare + (rewards / pool.tokensStaked);
-    }
-    lastRewardedBlock = floorBlock;
+    // Withdraw tokens
+    IERC20(pool.stakeToken).safeTransfer(address(msg.sender), amount);
   }
 
   /* Admin */
@@ -242,9 +222,10 @@ contract VucaStaking is Ownable {
     uint256 _rewardTokensPerBlock,
     uint32 _updateDelay
   ) external onlyOwner {
-    require(_startBlock > 0 && _startBlock < _endBlock, "Invalid start/end block");
+    require(_startBlock > block.number && _startBlock < _endBlock, "Invalid start/end block");
     require(_rewardToken != address(0), "Invalid reward token");
-    require(_stakeToken != address(0), "Invalid reward token");
+    require(_stakeToken != address(0), "Invalid staking token");
+    require(_stakeToken != _rewardToken, "Staking token cannot be the same as the reward token");
 
     pools[currentPoolId].inited = true;
     pools[currentPoolId].rewardToken = _rewardToken;
@@ -254,7 +235,7 @@ contract VucaStaking is Ownable {
     pools[currentPoolId].startBlock = _startBlock;
     pools[currentPoolId].endBlock = _endBlock;
 
-    pools[currentPoolId].rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20(_stakeToken).decimals()) * REWARDS_PRECISION;
+    pools[currentPoolId].rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20Helper(_stakeToken).decimals()) * REWARDS_PRECISION;
     pools[currentPoolId].lastRewardedBlock = _startBlock;
     pools[currentPoolId].updateDelay = _updateDelay; // = 8 hours;
 
@@ -268,7 +249,13 @@ contract VucaStaking is Ownable {
     require(pools[_poolId].inited, "Invalid Pool");
     require(block.number + pools[_poolId].updateDelay < pools[_poolId].endBlock, "Exceed Blocks");
 
-    PoolChanges memory changes = PoolChanges({ applied: false, rewardTokensPerBlock: pools[_poolId].rewardTokensPerBlock, endBlock: pools[_poolId].endBlock, maxStakeTokens: _maxStakeTokens, timestamp: block.timestamp, blockNumber: block.number });
+    PoolChanges memory changes = PoolChanges({
+      applied: false, //
+      updateParamId: UpdateParam.MaxStakeTokens,
+      updateParamValue: _maxStakeTokens,
+      timestamp: block.timestamp,
+      blockNumber: block.number
+    });
     poolsChanges[_poolId].push(changes);
 
     emit PoolUpdated(_poolId, pools[_poolId], changes, block.number + pools[_poolId].updateDelay);
@@ -278,9 +265,15 @@ contract VucaStaking is Ownable {
     require(pools[_poolId].inited, "Invalid Pool");
     require(block.number + pools[_poolId].updateDelay < pools[_poolId].endBlock, "Exceed Blocks");
 
-    uint256 rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20(pools[_poolId].stakeToken).decimals()) * REWARDS_PRECISION;
+    uint256 rewardTokensPerBlock = _rewardTokensPerBlock * (10**IERC20Helper(pools[_poolId].stakeToken).decimals()) * REWARDS_PRECISION;
 
-    PoolChanges memory changes = PoolChanges({ applied: false, rewardTokensPerBlock: rewardTokensPerBlock, endBlock: pools[_poolId].endBlock, maxStakeTokens: pools[_poolId].maxStakeTokens, timestamp: block.timestamp, blockNumber: block.number });
+    PoolChanges memory changes = PoolChanges({
+      applied: false, //
+      updateParamId: UpdateParam.RewardTokensPerBlock,
+      updateParamValue: rewardTokensPerBlock,
+      timestamp: block.timestamp,
+      blockNumber: block.number
+    });
     poolsChanges[_poolId].push(changes);
 
     emit PoolUpdated(_poolId, pools[_poolId], changes, block.number + pools[_poolId].updateDelay);
@@ -289,10 +282,16 @@ contract VucaStaking is Ownable {
   // end block updatable
   function updateEndBlock(uint16 _poolId, uint256 _endBlock) external onlyOwner {
     require(pools[_poolId].inited, "Invalid Pool");
-    require(block.number <= _endBlock, "Invalid input");
+    require(_endBlock > block.number + pools[_poolId].updateDelay, "Invalid input");
     require(block.number + pools[_poolId].updateDelay < pools[_poolId].endBlock, "Exceed Blocks");
 
-    PoolChanges memory changes = PoolChanges({ applied: false, rewardTokensPerBlock: pools[_poolId].rewardTokensPerBlock, endBlock: _endBlock, maxStakeTokens: pools[_poolId].maxStakeTokens, timestamp: block.timestamp, blockNumber: block.number });
+    PoolChanges memory changes = PoolChanges({
+      applied: false, //
+      updateParamId: UpdateParam.EndBlock,
+      updateParamValue: _endBlock,
+      timestamp: block.timestamp,
+      blockNumber: block.number
+    });
     poolsChanges[_poolId].push(changes);
 
     emit PoolUpdated(_poolId, pools[_poolId], changes, block.number + pools[_poolId].updateDelay);
@@ -321,28 +320,14 @@ contract VucaStaking is Ownable {
     _updatePoolRewards(_poolId, block.number);
     pool = pools[_poolId];
 
-    uint256 totalUserRewards = pool.totalUserRewards / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
-    uint256 rewardsWithdrew = pool.rewardsWithdrew / (10**IERC20(pool.stakeToken).decimals()) / REWARDS_PRECISION;
-    uint256 contractBalance = IERC20(pool.rewardToken).balanceOf(address(this));
+    uint256 totalUserRewards = pool.totalUserRewards / (10**IERC20Helper(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+    uint256 rewardsWithdrew = pool.rewardsWithdrew / (10**IERC20Helper(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+    uint256 contractBalance = IERC20Helper(pool.rewardToken).balanceOf(address(this));
 
     // maximum amount withdrawal = balance - max claimable
-    require(_amount + totalUserRewards <= contractBalance + rewardsWithdrew);
+    require(_amount + totalUserRewards <= contractBalance + rewardsWithdrew, "Insufficient pool rewards");
 
-    IERC20(pool.rewardToken).transfer(_to, _amount);
-  }
-
-  // for admin to withdraw tokens
-  function withdrawERC20(
-    uint16 _poolId,
-    address _to,
-    uint256 _amount
-  ) external onlyOwner {
-    _updatePoolInfo(_poolId);
-    Pool memory pool = pools[_poolId];
-    require(pool.endBlock <= block.number, "Staking active");
-    require(pool.tokensStaked == 0, "Not allowed");
-
-    IERC20(pool.rewardToken).transfer(_to, _amount);
+    IERC20(pool.rewardToken).safeTransfer(_to, _amount);
   }
 
   /* Internal */
@@ -363,9 +348,13 @@ contract VucaStaking is Ownable {
       }
 
       _updatePoolRewards(_poolId, updateAtBlock);
-      pool.maxStakeTokens = changes.maxStakeTokens;
-      pool.endBlock = changes.endBlock;
-      pool.rewardTokensPerBlock = changes.rewardTokensPerBlock;
+      if (changes.updateParamId == UpdateParam.MaxStakeTokens) {
+        pool.maxStakeTokens = changes.updateParamValue;
+      } else if (changes.updateParamId == UpdateParam.EndBlock) {
+        pool.endBlock = changes.updateParamValue;
+      } else if (changes.updateParamId == UpdateParam.RewardTokensPerBlock) {
+        pool.rewardTokensPerBlock = changes.updateParamValue;
+      }
       changes.applied = true;
     }
   }
@@ -373,26 +362,40 @@ contract VucaStaking is Ownable {
   function _updatePoolRewards(uint16 _poolId, uint256 _blockNumber) internal {
     Pool storage pool = pools[_poolId];
 
-    if (pool.tokensStaked == 0 && _blockNumber < pool.endBlock) {
-      pool.lastRewardedBlock = _blockNumber;
-      return;
+    Pool memory newPool = _getPoolRewards(pool, _blockNumber);
+
+    pool.accumulatedRewardsPerShare = newPool.accumulatedRewardsPerShare;
+    pool.lastRewardedBlock = newPool.lastRewardedBlock;
+    pool.totalUserRewards = newPool.totalUserRewards;
+    pool.lastRewardedBlock = newPool.lastRewardedBlock;
+  }
+
+  function _getPoolRewards(Pool memory _pool, uint256 _blockNumber) internal pure returns (Pool memory) {
+    uint256 floorBlock = _blockNumber <= _pool.endBlock ? _blockNumber : _pool.endBlock;
+
+    if (_pool.tokensStaked == 0) {
+      _pool.lastRewardedBlock = floorBlock;
+      return _pool;
     }
 
-    uint256 rewards;
-    (pool.accumulatedRewardsPerShare, pool.lastRewardedBlock, rewards) = getPoolRewardsCheckpoint(_poolId, _blockNumber);
-    pool.totalUserRewards += rewards;
+    uint256 blocksSinceLastReward;
+    if (floorBlock >= _pool.lastRewardedBlock) {
+      blocksSinceLastReward = floorBlock - _pool.lastRewardedBlock;
+    }
+    uint256 rewards = blocksSinceLastReward * _pool.rewardTokensPerBlock;
+    _pool.accumulatedRewardsPerShare = _pool.accumulatedRewardsPerShare + (rewards / _pool.tokensStaked);
+    _pool.lastRewardedBlock = floorBlock;
+    _pool.totalUserRewards += rewards;
+
+    return _pool;
+  }
+
+  function renounceOwnership() public virtual override onlyOwner {
+    revert("Ownable: renounceOwnership function is disabled");
   }
 }
 
-interface IERC20 {
-  function transferFrom(
-    address from,
-    address to,
-    uint256 amount
-  ) external returns (bool);
-
-  function transfer(address to, uint256 amount) external returns (bool);
-
+interface IERC20Helper {
   function decimals() external view returns (uint8);
 
   function balanceOf(address account) external view returns (uint256);

@@ -162,6 +162,7 @@ describe('Staking', () => {
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
+      await network.provider.send('evm_mine')
 
       await stakingContract.connect(bob).unStake(0)
       await network.provider.send('evm_mine')
@@ -1026,7 +1027,9 @@ describe('Staking', () => {
       expect((await usdtToken.balanceOf(alice.address)).toNumber() / 10 ** 6).equal(14.999999)
     })
 
-    it('withdrawERC20 should be success', async () => {
+    it('retrieveReward should be success without staking', async () => {
+      let withdrawable1 = Number(await usdtToken.balanceOf(stakingContract.address))
+
       await stakingContract.connect(owner).createPool(
         usdtToken.address,
         cwtToken.address,
@@ -1060,68 +1063,44 @@ describe('Staking', () => {
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
+      await stakingContract.connect(bob).unStake(0)
       await network.provider.send('evm_mine')
-      await stakingContract.connect(bob).stake(
-        0,
-        ethers.BigNumber.from(100)
-          .mul(TEN_E_18)
-          .toString()
-      )
       await network.provider.send('evm_mine')
-
-      await stakingContract.connect(owner).withdrawERC20(0, accounts[4].address, 100)
 
       poolInfo = await stakingContract.pools(0)
       expect(poolInfo.lastRewardedBlock.toNumber()).equal(10)
       expect(poolInfo.accumulatedRewardsPerShare.toNumber()).equal(0)
 
-      await stakingContract.connect(bob).stake(
-        0,
-        ethers.BigNumber.from(100)
-          .mul(TEN_E_18)
-          .toString()
-      )
       await network.provider.send('evm_mine')
-
-      await network.provider.send('evm_mine')
-
-      await stakingContract.connect(bob).stake(
-        0,
-        ethers.BigNumber.from(100)
-          .mul(TEN_E_18)
-          .toString()
-      )
-      await stakingContract.connect(alice).stake(
-        0,
-        ethers.BigNumber.from(300)
-          .mul(TEN_E_18)
-          .toString()
-      )
-      await network.provider.send('evm_mine')
-
-      // unStake
       await stakingContract.connect(bob).emergencyWithdraw(0)
+
       await network.provider.send('evm_mine')
       await network.provider.send('evm_mine')
-
-      await stakingContract.connect(owner).withdrawERC20(0, accounts[4].address, 100)
-      await stakingContract.connect(bob).unStake(0)
       await network.provider.send('evm_mine')
 
-      await stakingContract.connect(alice).unStake(0)
+      // let res = await usdtToken.balanceOf(stakingContract.address)
+      // console.log('1', res)
+
+      const withdrawable = Number(await stakingContract.getRewardsWithdrawable(0))
+
+      expect(withdrawable).equal(withdrawable1)
+
+      // console.log(await stakingContract.getLatestPoolInfo(0))
+      await stakingContract.connect(owner).retrieveReward(
+        0, //
+        accounts[4].address,
+        withdrawable1 + 100
+      )
+
+      await stakingContract.connect(owner).retrieveReward(
+        0, //
+        accounts[4].address,
+        withdrawable1
+      )
       await network.provider.send('evm_mine')
 
-      poolInfo = await stakingContract.pools(0)
-
-      expect(poolInfo.lastRewardedBlock.toNumber()).equal(14)
-
-      expect((await usdtToken.balanceOf(bob.address)).toNumber() / 10 ** 6).equal(0)
-      expect((await usdtToken.balanceOf(alice.address)).toNumber() / 10 ** 6).equal(4.999999)
-
-      const amount = (await usdtToken.balanceOf(stakingContract.address)).toString()
-      await stakingContract.connect(owner).withdrawERC20(0, accounts[4].address, amount)
-      await network.provider.send('evm_mine')
-      expect((await usdtToken.balanceOf(accounts[4].address)).toNumber()).equal(Number(amount))
+      const res = await usdtToken.balanceOf(accounts[4].address)
+      expect(res).equal(withdrawable1)
     })
   })
 })

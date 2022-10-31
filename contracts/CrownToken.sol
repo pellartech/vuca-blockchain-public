@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.15;
+pragma solidity 0.8.17;
 
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { VucaOwnable } from "./VucaOwnable.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 // VUCA + Pellar + LightLink 2022
 
-contract CrownToken is Ownable, ERC20 {
+contract CrownToken is VucaOwnable, ERC20 {
   uint256 public constant MAX_SUPPLY = 140000000; // max supply of tokens (hard cap)
 
   constructor() ERC20("CROWN", "CROWN") {
