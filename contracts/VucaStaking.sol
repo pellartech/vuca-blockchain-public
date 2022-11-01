@@ -291,16 +291,6 @@ contract VucaStaking is VucaOwnable {
     emit PoolUpdated("PoolUpdated", _poolId, pools[_poolId], changes, block.number + pools[_poolId].updateDelay);
   }
 
-  /* @Dev only, remove in prod */
-  function updateChangesDelayBlocks(uint16 _poolId, uint32 _blocks) external onlyOwner {
-    require(pools[_poolId].inited, "Invalid Pool");
-
-    pools[_poolId].updateDelay = _blocks;
-    PoolChanges memory changes;
-
-    emit PoolUpdated("PoolUpdated", _poolId, pools[_poolId], changes, block.number);
-  }
-
   // withdraw reward token held in contract
   function retrieveReward(uint16 _poolId, address _to) external onlyOwner {
     _updatePoolInfo(_poolId);
