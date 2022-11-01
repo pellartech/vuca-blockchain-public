@@ -312,7 +312,7 @@ contract VucaStaking is VucaOwnable {
 
     pool.extension.rewardsWithdrew += amount;
 
-    emit RewardsRetrieved('RewardsRetrieved', _poolId, amount);
+    emit RewardsRetrieved("RewardsRetrieved", _poolId, amount);
 
     IERC20(pool.rewardToken).safeTransfer(_to, amount);
   }
@@ -345,7 +345,9 @@ contract VucaStaking is VucaOwnable {
       }
       changes.applied = true;
     }
-    pool.extension.currentPoolChangeId = i;
+    if (i > 0) {
+      pool.extension.currentPoolChangeId = i - 1;
+    }
   }
 
   function _updatePoolRewards(uint16 _poolId, uint256 _blockNumber) internal {
