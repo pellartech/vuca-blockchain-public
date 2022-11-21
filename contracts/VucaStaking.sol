@@ -120,7 +120,7 @@ contract VucaStaking is VucaOwnable {
     IERC20(pool.stakeToken).safeTransferFrom(address(msg.sender), address(this), _amount);
   }
 
-  // if user withdraws before staking period ends, they forfeit all rewards
+  // rewards will be forfeited if this is called (use unStake to obtain rewards after staking period)
   function emergencyWithdraw(uint16 _poolId) external {
     _updatePoolInfo(_poolId);
     Pool storage pool = pools[_poolId];
