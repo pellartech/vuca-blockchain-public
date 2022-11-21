@@ -189,7 +189,6 @@ contract VucaStaking is VucaOwnable {
     require(_startBlock > block.number && _startBlock < _endBlock, "Invalid start/end block");
     require(_rewardToken != address(0), "Invalid reward token");
     require(_stakeToken != address(0), "Invalid staking token");
-    require(_stakeToken != _rewardToken, "Staking token cannot be the same as the reward token");
 
     pools[currentPoolId].inited = true;
     pools[currentPoolId].rewardToken = _rewardToken;
