@@ -79,7 +79,7 @@ contract VucaStaking is VucaOwnable {
 
   /* View */
   // rewards w/o adjustment
-  function getRawRewards(uint16 _poolId, address _account) public view returns (uint256) {
+  function getRawRewards(uint16 _poolId, address _account) internal view returns (uint256) {
     Staking memory staking = stakingUsersInfo[_poolId][_account];
     Pool memory pool = pools[_poolId];
 
@@ -89,7 +89,7 @@ contract VucaStaking is VucaOwnable {
   }
 
   // rewards with adjustment
-  function getRewards(uint16 _poolId, address _account) public view returns (uint256) {
+  function getRewards(uint16 _poolId, address _account) internal view returns (uint256) {
     uint256 rawRewards = getRawRewards(_poolId, _account);
 
     return rawRewards / (10**IERC20Helper(pools[_poolId].stakeToken).decimals()) / REWARDS_PRECISION;
