@@ -298,6 +298,11 @@ contract VucaStaking is VucaOwnable {
     Pool storage pool = pools[_poolId];
     require(pool.endBlock < block.number, "Staking active");
 
+    uint256 rewardTokenPerBlock = pool.rewardTokensPerBlock / (10**IERC20Helper(pool.stakeToken).decimals()) / REWARDS_PRECISION;
+    uint256 minPoolRewards = rewardTokenPerBlock * (pool.endBlock - pool.startBlock + 1);
+
+    require(minPoolRewards <= pool.extension.totalPoolRewards, "Insufficient funds");
+
     _updatePoolRewards(_poolId, block.number);
 
     uint256 totalPoolRewards = pool.extension.totalPoolRewards;
