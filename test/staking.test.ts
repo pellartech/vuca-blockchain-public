@@ -12,6 +12,8 @@ const { expect } = chai
 
 const TEN_E_18 = ethers.utils.parseEther('1')
 
+const totalRewards = 10 * 10 ** 6
+
 describe('Staking', () => {
   let accounts: SignerWithAddress[]
   let owner: SignerWithAddress, bob: SignerWithAddress, alice: SignerWithAddress, john: SignerWithAddress
@@ -61,7 +63,7 @@ describe('Staking', () => {
           .toString(),
         10,
         14,
-        10 * 10 ** 6,
+        totalRewards,
         1
       )
       await stakingContract.connect(owner).createPool(
@@ -72,7 +74,7 @@ describe('Staking', () => {
           .toString(),
         10,
         14,
-        10 * 10 ** 6,
+        totalRewards,
         1
       )
       await stakingContract.connect(owner).createPool(
@@ -83,7 +85,7 @@ describe('Staking', () => {
           .toString(),
         0,
         14,
-        10 * 10 ** 6,
+        totalRewards,
         1
       )
       await stakingContract.connect(owner).createPool(
@@ -94,7 +96,7 @@ describe('Staking', () => {
           .toString(),
         15,
         14,
-        10 * 10 ** 6,
+        totalRewards,
         1
       )
       await stakingContract.connect(owner).createPool(
@@ -105,13 +107,13 @@ describe('Staking', () => {
           .toString(),
         10,
         14,
-        10 * 10 ** 6,
+        totalRewards,
         1
       )
       await stakingContract.connect(bob).stake(0, ethers.BigNumber.from(100).mul(TEN_E_18).toString())
       await network.provider.send('evm_mine')
 
-      await stakingContract.connect(owner).depositPoolReward(0)
+      await stakingContract.connect(owner).depositPoolReward(0, 5 * totalRewards)
       await network.provider.send('evm_mine')
 
       let poolInfo = await stakingContract.pools(0)
@@ -122,7 +124,7 @@ describe('Staking', () => {
       expect(poolInfo.startBlock.toNumber()).equal(10)
       expect(poolInfo.endBlock.toNumber()).equal(14)
       expect(poolInfo.rewardTokensPerBlock).equal(
-        ethers.BigNumber.from(10 * 10 ** 6)
+        ethers.BigNumber.from(totalRewards)
           .mul(TEN_E_18)
           .mul(TEN_E_18)
       )
@@ -174,10 +176,10 @@ describe('Staking', () => {
           .toString(),
         10,
         14,
-        10 * 10 ** 6,
+        totalRewards,
         1
       )
-      await stakingContract.connect(owner).depositPoolReward(0)
+      await stakingContract.connect(owner).depositPoolReward(0, 5 * totalRewards)
       await network.provider.send('evm_mine')
 
       let poolInfo = await stakingContract.pools(0)
@@ -188,7 +190,7 @@ describe('Staking', () => {
       expect(poolInfo.startBlock.toNumber()).equal(10)
       expect(poolInfo.endBlock.toNumber()).equal(14)
       expect(poolInfo.rewardTokensPerBlock).equal(
-        ethers.BigNumber.from(10 * 10 ** 6)
+        ethers.BigNumber.from(totalRewards)
           .mul(TEN_E_18)
           .mul(TEN_E_18)
       )
@@ -268,10 +270,10 @@ describe('Staking', () => {
           .toString(),
         10,
         14,
-        10 * 10 ** 6,
+        totalRewards,
         1
       )
-      await stakingContract.connect(owner).depositPoolReward(0)
+      await stakingContract.connect(owner).depositPoolReward(0, 5 * totalRewards)
       await network.provider.send('evm_mine')
 
       let poolInfo = await stakingContract.pools(0)
@@ -282,7 +284,7 @@ describe('Staking', () => {
       expect(poolInfo.startBlock.toNumber()).equal(10)
       expect(poolInfo.endBlock.toNumber()).equal(14)
       expect(poolInfo.rewardTokensPerBlock).equal(
-        ethers.BigNumber.from(10 * 10 ** 6)
+        ethers.BigNumber.from(totalRewards)
           .mul(TEN_E_18)
           .mul(TEN_E_18)
       )
@@ -355,10 +357,10 @@ describe('Staking', () => {
           .toString(),
         10,
         14,
-        10 * 10 ** 6,
+        totalRewards,
         1
       )
-      await stakingContract.connect(owner).depositPoolReward(0)
+      await stakingContract.connect(owner).depositPoolReward(0, 5 * totalRewards)
       await network.provider.send('evm_mine')
 
       let poolInfo = await stakingContract.pools(0)
@@ -369,7 +371,7 @@ describe('Staking', () => {
       expect(poolInfo.startBlock.toNumber()).equal(10)
       expect(poolInfo.endBlock.toNumber()).equal(14)
       expect(poolInfo.rewardTokensPerBlock).equal(
-        ethers.BigNumber.from(10 * 10 ** 6)
+        ethers.BigNumber.from(totalRewards)
           .mul(TEN_E_18)
           .mul(TEN_E_18)
       )
@@ -437,10 +439,10 @@ describe('Staking', () => {
           .toString(),
         10,
         14,
-        10 * 10 ** 6,
+        totalRewards,
         1
       )
-      await stakingContract.connect(owner).depositPoolReward(0)
+      await stakingContract.connect(owner).depositPoolReward(0, 5 * totalRewards)
       await network.provider.send('evm_mine')
 
       let poolInfo = await stakingContract.pools(0)
@@ -451,7 +453,7 @@ describe('Staking', () => {
       expect(poolInfo.startBlock.toNumber()).equal(10)
       expect(poolInfo.endBlock.toNumber()).equal(14)
       expect(poolInfo.rewardTokensPerBlock).equal(
-        ethers.BigNumber.from(10 * 10 ** 6)
+        ethers.BigNumber.from(totalRewards)
           .mul(TEN_E_18)
           .mul(TEN_E_18)
       )
@@ -515,10 +517,10 @@ describe('Staking', () => {
           .toString(),
         10,
         20,
-        10 * 10 ** 6,
+        totalRewards,
         3
       )
-      await stakingContract.connect(owner).depositPoolReward(0)
+      await stakingContract.connect(owner).depositPoolReward(0, 20 * totalRewards)
       await network.provider.send('evm_mine')
 
       let poolInfo = await stakingContract.pools(0)
@@ -529,7 +531,7 @@ describe('Staking', () => {
       expect(poolInfo.startBlock.toNumber()).equal(10)
       expect(poolInfo.endBlock.toNumber()).equal(20)
       expect(poolInfo.rewardTokensPerBlock).equal(
-        ethers.BigNumber.from(10 * 10 ** 6)
+        ethers.BigNumber.from(totalRewards)
           .mul(TEN_E_18)
           .mul(TEN_E_18)
       )
@@ -605,7 +607,7 @@ describe('Staking', () => {
 
     it('retrieveReward should be success', async () => {
       await stakingContract.connect(owner).createPool(usdtToken.address, cwtToken.address, ethers.BigNumber.from(1).mul(TEN_E_18).toString(), 10, 14, 10 * 10 ** 6, 2)
-      await stakingContract.connect(owner).depositPoolReward(0)
+      await stakingContract.connect(owner).depositPoolReward(0, 5 * totalRewards)
       await network.provider.send('evm_mine')
 
       await network.provider.send('evm_mine')
@@ -628,7 +630,7 @@ describe('Staking', () => {
     //     10 * 10 ** 6,
     //     2
     //   )
-    //   await stakingContract.connect(owner).depositPoolReward(0)
+    //   await stakingContract.connect(owner).depositPoolReward(0, 5 * totalRewards)
 
     //   await stakingContract.connect(owner).updateChangesDelayBlocks(1, 1)
     //   await stakingContract.connect(owner).updateChangesDelayBlocks(0, 1)
@@ -741,7 +743,7 @@ describe('Staking', () => {
         10 * 10 ** 6,
         1
       )
-      await stakingContract.connect(owner).depositPoolReward(0)
+      await stakingContract.connect(owner).depositPoolReward(0, 5 * totalRewards)
       await network.provider.send('evm_mine')
 
       let poolInfo = await stakingContract.pools(0)
@@ -842,7 +844,7 @@ describe('Staking', () => {
         10 * 10 ** 6,
         1
       )
-      await stakingContract.connect(owner).depositPoolReward(0)
+      await stakingContract.connect(owner).depositPoolReward(0, 5 * totalRewards)
       await network.provider.send('evm_mine')
 
       const withdrawable1 = Number(await usdtToken.balanceOf(stakingContract.address))
@@ -910,10 +912,10 @@ describe('Staking', () => {
           .toString(),
         10,
         15,
-        10 * 10 ** 6,
+        totalRewards,
         1
       )
-      await stakingContract.connect(owner).depositPoolReward(0)
+      await stakingContract.connect(owner).depositPoolReward(0, 6 * totalRewards)
       await network.provider.send('evm_mine')
 
       let poolInfo = await stakingContract.pools(0)
@@ -924,7 +926,7 @@ describe('Staking', () => {
       expect(poolInfo.startBlock.toNumber()).equal(10)
       expect(poolInfo.endBlock.toNumber()).equal(15)
       expect(poolInfo.rewardTokensPerBlock).equal(
-        ethers.BigNumber.from(10 * 10 ** 6)
+        ethers.BigNumber.from(totalRewards)
           .mul(TEN_E_18)
           .mul(TEN_E_18)
       )
@@ -983,10 +985,10 @@ describe('Staking', () => {
           .toString(),
         10,
         14,
-        10 * 10 ** 6,
+        totalRewards,
         2
       )
-      await stakingContract.connect(owner).depositPoolReward(0)
+      await stakingContract.connect(owner).depositPoolReward(0, 5 * totalRewards)
 
       await network.provider.send('evm_mine')
 
@@ -998,7 +1000,7 @@ describe('Staking', () => {
       expect(poolInfo.startBlock.toNumber()).equal(10)
       expect(poolInfo.endBlock.toNumber()).equal(14)
       expect(poolInfo.rewardTokensPerBlock).equal(
-        ethers.BigNumber.from(10 * 10 ** 6)
+        ethers.BigNumber.from(totalRewards)
           .mul(TEN_E_18)
           .mul(TEN_E_18)
       )
@@ -1053,25 +1055,12 @@ describe('Staking', () => {
         10 * 10 ** 6,
         2
       )
-      await stakingContract.connect(owner).depositPoolReward(1)
+      await stakingContract.connect(owner).depositPoolReward(1, totalRewards)
 
       await network.provider.send('evm_mine')
 
       poolInfo = await stakingContract.pools(1)
-      expect(poolInfo.inited).equal(true)
-      expect(poolInfo.rewardToken).equal(usdtToken.address)
-      expect(poolInfo.stakeToken).equal(cwtToken.address)
-      expect(poolInfo.maxStakeTokens).equal(ethers.BigNumber.from(10 ** 6).mul(TEN_E_18))
-      expect(poolInfo.startBlock.toNumber()).equal(100)
-      expect(poolInfo.endBlock.toNumber()).equal(125)
-      expect(poolInfo.rewardTokensPerBlock).equal(
-        ethers.BigNumber.from(10 * 10 ** 6)
-          .mul(TEN_E_18)
-          .mul(TEN_E_18)
-      )
-      expect(poolInfo.tokensStaked).equal(0)
-      expect(poolInfo.lastRewardedBlock.toNumber()).equal(100)
-      expect(poolInfo.accumulatedRewardsPerShare.toNumber()).equal(0)
+      expect(poolInfo.inited).equal(false)
     })
   })
 })

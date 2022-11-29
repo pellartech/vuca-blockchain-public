@@ -151,11 +151,6 @@ contract VucaStaking is VucaOwnable {
     Pool storage pool = pools[_poolId];
     require(pool.endBlock < block.number, "Staking active");
 
-    uint256 rewardTokenPerBlock = pool.rewardTokensPerBlock / (10**IERC20Helper(pool.stakeToken).decimals()) / REWARDS_PRECISION;
-    uint256 totalPoolRewards = rewardTokenPerBlock * (pool.endBlock - pool.startBlock + 1);
-
-    require(totalPoolRewards <= pool.extension.totalPoolRewards, "Insufficient funds");
-
     Staking storage staking = stakingUsersInfo[_poolId][msg.sender];
     uint256 amount = staking.amount;
     require(staking.amount > 0, "Insufficient funds");
@@ -193,7 +188,7 @@ contract VucaStaking is VucaOwnable {
     require(_startBlock > block.number && _startBlock < _endBlock, "Invalid start/end block");
     require(_rewardToken != address(0), "Invalid reward token");
     require(_stakeToken != address(0), "Invalid staking token");
-    require(currentPoolId == 0 || pools[currentPoolId - 1].endBlock < block.number, "Previous pool active");
+    require(currentPoolId == 0, "Staking pool was already created");
 
     pools[currentPoolId].inited = true;
     pools[currentPoolId].rewardToken = _rewardToken;
@@ -211,25 +206,18 @@ contract VucaStaking is VucaOwnable {
     currentPoolId += 1;
   }
 
-  function depositPoolReward(uint16 _poolId) public {
+  function depositPoolReward(uint16 _poolId, uint256 _amount) public {
     Pool storage pool = pools[_poolId];
     require(pool.inited, "Pool invalid");
+    require(_amount > 0, "Invalid amount");
     _updatePoolInfo(_poolId);
 
-    uint256 rewardTokenPerBlock = pool.rewardTokensPerBlock / (10**IERC20Helper(pool.stakeToken).decimals()) / REWARDS_PRECISION;
-    uint256 totalPoolRewards = rewardTokenPerBlock * (pool.endBlock - pool.startBlock + 1);
+    pool.extension.totalPoolRewards += _amount;
 
-    require(totalPoolRewards > pool.extension.totalPoolRewards, "Already deposited");
-
-    uint256 amount = totalPoolRewards - pool.extension.totalPoolRewards;
-
-    pool.extension.totalPoolRewards = totalPoolRewards;
-
-    IERC20(pool.rewardToken).safeTransferFrom(msg.sender, address(this), amount);
+    IERC20(pool.rewardToken).safeTransferFrom(msg.sender, address(this), _amount);
 
     PoolChanges memory changes;
-
-    emit PoolUpdated(2, currentPoolId, pools[_poolId], changes, block.number);
+    emit PoolUpdated(2, _poolId, pools[_poolId], changes, block.number);
   }
 
   function updateMaxStakeTokens(uint16 _poolId, uint256 _maxStakeTokens) external onlyOwner {
@@ -298,11 +286,6 @@ contract VucaStaking is VucaOwnable {
     _updatePoolInfo(_poolId);
     Pool storage pool = pools[_poolId];
     require(pool.endBlock < block.number, "Staking active");
-
-    uint256 rewardTokenPerBlock = pool.rewardTokensPerBlock / (10**IERC20Helper(pool.stakeToken).decimals()) / REWARDS_PRECISION;
-    uint256 minPoolRewards = rewardTokenPerBlock * (pool.endBlock - pool.startBlock + 1);
-
-    require(minPoolRewards <= pool.extension.totalPoolRewards, "Insufficient funds");
 
     _updatePoolRewards(_poolId, block.number);
 
