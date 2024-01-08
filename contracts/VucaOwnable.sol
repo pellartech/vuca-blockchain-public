@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity 0.8.19;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+
+// ADOT + VUCA + LightLink + Pellar 2023
 
 contract VucaOwnable is Ownable {
   address public candidateOwner;
