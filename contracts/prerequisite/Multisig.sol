@@ -24,6 +24,9 @@ contract Multisig is Multisigable {
   mapping(uint256 => mapping(address => bool)) public isConfirmed;
   Transaction[] public transactions;
 
+  event MemberAdded(address indexed member);
+  event MemberRemoved(address indexed member);
+
   event SubmitTransaction(uint256 indexed txIndex, address indexed account, uint256 value, bytes data);
   event ConfirmTransaction(uint256 indexed txIndex, address indexed owner);
   event RevokeConfirmation(uint256 indexed txIndex, address indexed owner);
@@ -32,6 +35,8 @@ contract Multisig is Multisigable {
   constructor() {
     __Multisigable_init(address(this));
     members.add(msg.sender);
+
+    emit MemberAdded(msg.sender);
   }
 
   /** Modifier */
@@ -97,12 +102,14 @@ contract Multisig is Multisigable {
   // verified
   function addMember(address _account) public virtual onlyMultisig {
     members.add(_account);
+    emit MemberAdded(_account);
   }
 
   // verified
   function removeMember(address _account) public virtual onlyMultisig {
     require(members.size() > 1, "Cannot remove last member");
     members.remove(_account);
+    emit MemberRemoved(_account);
   }
 
   // verified

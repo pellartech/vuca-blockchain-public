@@ -34,6 +34,7 @@ contract ListingSpot is BaseAdotService {
     TokenItem[] items;
     Distribution[] distributions;
     Runtime runtime;
+    uint256 version;
     uint256 nonce;
   }
 
@@ -45,6 +46,7 @@ contract ListingSpot is BaseAdotService {
   struct FulfillItem {
     address buyer;
     uint256 id;
+    uint256 version;
   }
 
   bytes public constant LISTING_ID_COUNTER_KEY = "LISTING_ID_COUNTER";
@@ -64,6 +66,7 @@ contract ListingSpot is BaseAdotService {
   function listItem(ListingItem memory _req, bytes[] calldata _signatures) external {
     _beforeExecute();
     verifyListingItem(_req, _signatures);
+    require(_req.version == 0, "Invalid version");
 
     _req.state = Constants.ItemState.Listed;
 
@@ -74,7 +77,7 @@ contract ListingSpot is BaseAdotService {
     IAdotKeeper(keeper()).emitEvent(
       serviceId(), //
       keccak256(LISTED_SPOT_ITEM_KEY),
-      '["uint256 id","tuple(uint8 state,address lister,tuple(uint8 itemType,address token,uint256 id,uint256 amount)[] items,tuple(address recipient,uint256 percentage)[] distributions,tuple(uint8 itemType,address paymentToken,uint256 price,uint256 startTime,uint256 endTime,bytes32 whitelistProof,bytes data) runtime,uint256 nonce) item"]',
+      '["uint256 id","tuple(uint8 state,address lister,tuple(uint8 itemType,address token,uint256 id,uint256 amount)[] items,tuple(address recipient,uint256 percentage)[] distributions,tuple(uint8 itemType,address paymentToken,uint256 price,uint256 startTime,uint256 endTime,bytes32 whitelistProof,bytes data) runtime,uint256 version,uint256 nonce) item"]',
       abi.encode(_listingId, _req)
     );
 
@@ -90,15 +93,17 @@ contract ListingSpot is BaseAdotService {
     ListingItem memory _listingItem = abi.decode(IAdotKeeper(keeper()).getBytes(serviceId(), listingId), (ListingItem));
     require(_listingItem.state == Constants.ItemState.Listed, "Invalid state");
     require(_listingItem.lister == _req.lister, "Invalid lister");
+    require(_listingItem.version + 1 == _req.version, "Invalid version");
 
     _listingItem.runtime = _req.runtime;
     _listingItem.nonce = _req.nonce;
+    _listingItem.version = _req.version;
 
     IAdotKeeper(keeper()).setBytes(serviceId(), listingId, abi.encode(_listingItem));
     IAdotKeeper(keeper()).emitEvent(
       serviceId(), //
       keccak256(UPDATED_LISTING_SPOT_ITEM_KEY),
-      '["uint256 id","tuple(uint8 state,address lister,tuple(uint8 itemType,address token,uint256 id,uint256 amount)[] items,tuple(address recipient,uint256 percentage)[] distributions,tuple(uint8 itemType,address paymentToken,uint256 price,uint256 startTime,uint256 endTime,bytes32 whitelistProof,bytes data) runtime,uint256 nonce) item"]',
+      '["uint256 id","tuple(uint8 state,address lister,tuple(uint8 itemType,address token,uint256 id,uint256 amount)[] items,tuple(address recipient,uint256 percentage)[] distributions,tuple(uint8 itemType,address paymentToken,uint256 price,uint256 startTime,uint256 endTime,bytes32 whitelistProof,bytes data) runtime,uint256 version,uint256 nonce) item"]',
       abi.encode(_id, _listingItem)
     );
     IAdotKeeper(keeper()).increaseNonce(serviceId(), _req.lister);
@@ -126,7 +131,7 @@ contract ListingSpot is BaseAdotService {
     bytes memory listingId = abi.encode(LISTING_SPOT_ITEM_PREFIX, _req.id);
     ListingItem memory _listingItem = verifyFulfillListingItem(_req, _signatures);
 
-    for (uint256 i = 0; i < _listingItem.distributions.length; i++) {
+    for (uint256 i; i < _listingItem.distributions.length; i++) {
       IAdotKeeper(keeper()).transferTokenBetween(
         serviceId(), //
         _listingItem.runtime.itemType,
@@ -138,7 +143,7 @@ contract ListingSpot is BaseAdotService {
       );
     }
 
-    for (uint256 i = 0; i < _listingItem.items.length; i++) {
+    for (uint256 i; i < _listingItem.items.length; i++) {
       IAdotKeeper(keeper()).transferTokenBetween(
         serviceId(), //
         _listingItem.items[i].itemType,
@@ -155,7 +160,7 @@ contract ListingSpot is BaseAdotService {
     IAdotKeeper(keeper()).emitEvent(
       serviceId(), //
       keccak256(FULFILLED_SPOT_ITEM_KEY),
-      '["tuple(address buyer,uint256 id) item","tuple(uint8 itemType,address paymentToken,uint256 price,uint256 startTime,uint256 endTime,bytes32 whitelistProof,bytes data) runtime"]',
+      '["tuple(address buyer,uint256 id,uint256 version) item","tuple(uint8 itemType,address paymentToken,uint256 price,uint256 startTime,uint256 endTime,bytes32 whitelistProof,bytes data) runtime"]',
       abi.encode(_req, _listingItem.runtime)
     );
   }
@@ -170,7 +175,7 @@ contract ListingSpot is BaseAdotService {
 
     // check token type
     // check owner of token item
-    for (uint256 i = 0; i < _req.items.length; i++) {
+    for (uint256 i; i < _req.items.length; i++) {
       checkSupportTradeableTokenItem(_req.items[i].itemType);
 
       require(
@@ -197,7 +202,7 @@ contract ListingSpot is BaseAdotService {
 
     // check allowance
     uint256 totalPercentage = 0;
-    for (uint256 i = 0; i < _req.distributions.length; i++) {
+    for (uint256 i; i < _req.distributions.length; i++) {
       require(_req.distributions[i].recipient != address(0), "Invalid recipient");
       totalPercentage += _req.distributions[i].percentage;
     }
@@ -233,6 +238,7 @@ contract ListingSpot is BaseAdotService {
     require(_listingItem.state == Constants.ItemState.Listed, "Invalid state");
     require(_listingItem.runtime.startTime < block.timestamp, "Not started");
     require(_listingItem.runtime.endTime > block.timestamp, "Already ended");
+    require(_listingItem.version == _req.version, "Version mismatch");
 
     return _listingItem;
   }
@@ -253,22 +259,22 @@ contract ListingSpot is BaseAdotService {
 
   // verified
   function verifyFullfillRequest(FulfillItem memory _req, bytes[] calldata _signatures) public view returns (address, bool) {
-    bytes32 structHash = keccak256("FulfillItem(address buyer,uint256 id)");
-    address user = _hashTypedDataV4Custom(keccak256(abi.encode(structHash, _req.buyer, _req.id))).recover(_signatures[0]);
+    bytes32 structHash = keccak256("FulfillItem(address buyer,uint256 id,uint256 version)");
+    address user = _hashTypedDataV4Custom(keccak256(abi.encode(structHash, _req.buyer, _req.id, _req.version))).recover(_signatures[0]);
     return (user, user == _req.buyer);
   }
 
   // verified
   function hash(ListingItem memory _req) internal pure returns (bytes32) {
     // array
-    bytes32 structHash = keccak256("ListingItem(uint8 state,address lister,TokenItem[] items,Distribution[] distributions,Runtime runtime,uint256 nonce)Distribution(address recipient,uint256 percentage)Runtime(uint8 itemType,address paymentToken,uint256 price,uint256 startTime,uint256 endTime,bytes32 whitelistProof,bytes data)TokenItem(uint8 itemType,address token,uint256 id,uint256 amount)");
+    bytes32 structHash = keccak256("ListingItem(uint8 state,address lister,TokenItem[] items,Distribution[] distributions,Runtime runtime,uint256 version,uint256 nonce)Distribution(address recipient,uint256 percentage)Runtime(uint8 itemType,address paymentToken,uint256 price,uint256 startTime,uint256 endTime,bytes32 whitelistProof,bytes data)TokenItem(uint8 itemType,address token,uint256 id,uint256 amount)");
     bytes32[] memory encodedItems = new bytes32[](_req.items.length);
-    for (uint256 i = 0; i < _req.items.length; i++) {
+    for (uint256 i; i < _req.items.length; i++) {
       encodedItems[i] = hash(_req.items[i]);
     }
 
     bytes32[] memory encodedDistributions = new bytes32[](_req.distributions.length);
-    for (uint256 i = 0; i < _req.distributions.length; i++) {
+    for (uint256 i; i < _req.distributions.length; i++) {
       encodedDistributions[i] = hash(_req.distributions[i]);
     }
 
@@ -281,6 +287,7 @@ contract ListingSpot is BaseAdotService {
           keccak256(abi.encodePacked(encodedItems)),
           keccak256(abi.encodePacked(encodedDistributions)),
           hash(_req.runtime),
+          _req.version,
           _req.nonce
         )
       );

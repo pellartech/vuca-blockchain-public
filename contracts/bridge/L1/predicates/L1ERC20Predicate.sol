@@ -117,7 +117,7 @@ contract L1ERC20Predicate is
     l2Predicate = _l2Predicate;
   }
 
-  function mapToken(address _l1Token) public {
+  function mapToken(address _l1Token) public requireMultisig {
     // check if token is already mapped
     require(l2Predicate != address(0x0), "Invalid L2 pair");
     require(l1ToL2Gateway[_l1Token] == address(0x0), "Already mapped");
