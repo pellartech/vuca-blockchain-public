@@ -89,7 +89,7 @@ contract AdotKeeper is
   }
 
   function delUint256(bytes32 _serviceId, bytes calldata _key) external requireSevice(_serviceId) {
-    delete key2Value[_serviceId][_key];
+    delete key2ValueUint256[_serviceId][_key];
   }
 
   // address
@@ -164,20 +164,20 @@ contract AdotKeeper is
     require(_token != address(0), "Invalid token");
     require(_to != address(0), "Invalid to");
     require(_amount > 0, "Invalid amount");
-    IERC20(_token).transfer(_to, _amount);
+    IERC20(_token).safeTransfer(_to, _amount);
   }
 
   function tranferERC721Out(bytes32 _serviceId, address _token, address _to, uint256 _tokenId) external requireSevice(_serviceId) {
     require(_token != address(0), "Invalid token");
     require(_to != address(0), "Invalid to");
-    require(_tokenId > 0, "Invalid tokenId");
+    require(_tokenId >= 0, "Invalid tokenId");
     IERC721(_token).transferFrom(address(this), _to, _tokenId);
   }
 
   function tranferERC1155Out(bytes32 _serviceId, address _token, address _to, uint256 _tokenId, uint256 _amount) external requireSevice(_serviceId) {
     require(_token != address(0), "Invalid token");
     require(_to != address(0), "Invalid to");
-    require(_tokenId > 0, "Invalid tokenId");
+    require(_tokenId >= 0, "Invalid tokenId");
     require(_amount > 0, "Invalid amount");
     IERC1155(_token).safeTransferFrom(address(this), _to, _tokenId, _amount, "");
   }
@@ -192,14 +192,14 @@ contract AdotKeeper is
   function tranferERC721In(bytes32 _serviceId, address _token, address _from, uint256 _tokenId) external requireSevice(_serviceId) {
     require(_token != address(0), "Invalid token");
     require(_from != address(0), "Invalid from");
-    require(_tokenId > 0, "Invalid tokenId");
+    require(_tokenId >= 0, "Invalid tokenId");
     IERC721(_token).transferFrom(_from, address(this), _tokenId);
   }
 
   function tranferERC1155In(bytes32 _serviceId, address _token, address _from, uint256 _tokenId, uint256 _amount) external requireSevice(_serviceId) {
     require(_token != address(0), "Invalid token");
     require(_from != address(0), "Invalid from");
-    require(_tokenId > 0, "Invalid tokenId");
+    require(_tokenId >= 0, "Invalid tokenId");
     require(_amount > 0, "Invalid amount");
     IERC1155(_token).safeTransferFrom(_from, address(this), _tokenId, _amount, "");
   }

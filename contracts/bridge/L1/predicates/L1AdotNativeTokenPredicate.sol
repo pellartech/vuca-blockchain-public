@@ -42,7 +42,7 @@ contract L1AdotNativeTokenPredicate is
   }
 
   receive() external payable {
-    _initiateDeposit(address(0), msg.sender, msg.sender, msg.value);
+    revert("Not supported");
   }
 
   function recovery(address _to) external requireMultisig {

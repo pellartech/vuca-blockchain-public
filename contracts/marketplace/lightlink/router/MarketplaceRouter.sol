@@ -58,7 +58,7 @@ contract AdotRouter is Initializable, UUPSUpgradeable {
     bool[] memory success = new bool[](_serviceIds.length);
     bytes[] memory message = new bytes[](_serviceIds.length);
 
-    for (uint256 i = 0; i < _serviceIds.length; i++) {
+    for (uint256 i; i < _serviceIds.length; i++) {
       (success[i], message[i]) = forwardStaticcallRequest(_serviceIds[i], bytesCallers[i]);
     }
 
