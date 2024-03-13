@@ -131,7 +131,7 @@ contract ListingEnglishAuction is BaseAdotService {
     LatestBid memory _latestBid = abi.decode(IAdotKeeper(keeper()).getBytes(serviceId(), latestBidId), (LatestBid));
     require(_latestBid.bidder == address(0), "Invalid bid");
 
-    IAdotKeeper(keeper()).setBytes(serviceId(), abi.encode(LATEST_BID_ITEM_PREFIX, listingId), abi.encode(LatestBid({ bidder: address(0), price: _req.runtime.price })));
+    IAdotKeeper(keeper()).setBytes(serviceId(), latestBidId, abi.encode(LatestBid({ bidder: address(0), price: _req.runtime.price })));
 
     _listingItem.runtime = _req.runtime;
     _listingItem.nonce = _req.nonce;
